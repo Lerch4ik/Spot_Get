@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SpotGet</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0a0a0a;
+    color: #fff;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* Logo */
+  .logo {
+    font-size: 42px;
+    font-weight: 900;
+    letter-spacing: 2px;
+    margin-bottom: 10px;
+  }
+  .logo .spot { color: #ffffff; }
+  .logo .get  { color: #1db954; }
+
+  .subtitle {
+    font-size: 11px;
+    letter-spacing: 6px;
+    color: #555;
+    text-transform: uppercase;
+    margin-bottom: 48px;
+  }
+
+  /* Progress bar */
+  .progress-wrap {
+    width: 260px;
+    margin-bottom: 14px;
+  }
+  .progress-track {
+    width: 100%;
+    height: 2px;
+    background: #1a1a1a;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #1db954, #1ed760);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+    box-shadow: 0 0 8px rgba(29, 185, 84, 0.6);
+  }
+
+  /* Status text */
+  .status {
+    font-size: 12px;
+    color: #444;
+    text-align: center;
+    height: 18px;
+    transition: opacity 0.2s;
+  }
+
+  /* Tool row */
+  .tools {
+    margin-top: 28px;
+    display: flex;
+    gap: 20px;
+  }
+  .tool {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: #333;
+    transition: color 0.3s;
+  }
+  .tool.done  { color: #1db954; }
+  .tool.error { color: #e53935; }
+  .tool .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
+  }
+  .tool .dot.spin {
+    animation: spin-dot 1s linear infinite;
+  }
+  @keyframes spin-dot {
+    0%   { opacity: 1; }
+    50%  { opacity: 0.2; }
+    100% { opacity: 1; }
+  }
+
+  .retry-btn {
+    margin-top: 24px;
+    padding: 6px 20px;
+    font-size: 11px;
+    border: 1px solid #333;
+    border-radius: 20px;
+    background: transparent;
+    color: #666;
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s;
+    display: none;
+  }
+  .retry-btn:hover { border-color: #1db954; color: #1db954; }
+  .retry-btn.visible { display: block; }
+
+  .skip-btn {
+    margin-top: 10px;
+    padding: 6px 20px;
+    font-size: 11px;
+    border: 1px solid #222;
+    border-radius: 20px;
+    background: transparent;
+    color: #444;
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s;
+    display: none;
+  }
+  .skip-btn:hover { border-color: #1db954; color: #1db954; }
+  .skip-btn.visible { display: block; }
+</style>
+</head>
+<body>
+
+<div class="logo">
+  <span class="spot">SPOT</span><span class="get">GET</span>
+</div>
+<div class="subtitle">Music Downloader</div>
+
+<div class="progress-wrap">
+  <div class="progress-track">
+    <div class="progress-fill" id="bar"></div>
+  </div>
+</div>
+<div class="status" id="status">Initializing...</div>
+
+<div class="tools">
+  <div class="tool" id="tool-spotdl">
+    <div class="dot" id="dot-spotdl"></div>
+    <span>spotdl</span>
+  </div>
+  <div class="tool" id="tool-ytdlp">
+    <div class="dot" id="dot-ytdlp"></div>
+    <span>yt-dlp</span>
+  </div>
+</div>
+
+<button class="retry-btn" id="retry-btn" onclick="retryTools()">↺ Retry download</button>
+<button class="skip-btn" id="skip-btn" onclick="skipTools()">Skip &rarr;</button>
+
+<script>
+  const bar    = document.getElementById('bar')
+  const status = document.getElementById('status')
+  const retryBtn = document.getElementById('retry-btn')
+  const skipBtn  = document.getElementById('skip-btn')
+  let hasError = false
+
+  // Show skip button after 10 seconds
+  setTimeout(() => { skipBtn.classList.add('visible') }, 10000)
+
+  function setProgress(pct) { bar.style.width = pct + '%' }
+  function setStatus(text)   { status.textContent = text }
+
+  function setTool(name, state) {
+    const id = name === 'spotdl' ? 'spotdl' : 'ytdlp'
+    const toolEl = document.getElementById('tool-' + id)
+    const dotEl  = document.getElementById('dot-'  + id)
+    toolEl.className = 'tool'
+    dotEl.className  = 'dot'
+    if (state === 'loading') dotEl.classList.add('spin')
+    if (state === 'done' || state === 'skip') toolEl.classList.add('done')
+    if (state === 'error') {
+      toolEl.classList.add('error')
+      hasError = true
+      retryBtn.classList.add('visible')
+    }
+  }
+
+  function retryTools() {
+    // Tell main process to re-download via IPC (postMessage to main)
+    // This works because we injected a listener in main via executeJavaScript
+    if (window.__retryTools) window.__retryTools()
+  }
+
+  function skipTools() {
+    window.__skipRequested = true
+    setStatus('Skipping — opening app...')
+  }
+
+  window.addEventListener('message', (e) => {
+    const { type, payload } = e.data || {}
+    if (type === 'progress') setProgress(payload)
+    if (type === 'status')   setStatus(payload)
+    if (type === 'tool')     setTool(payload.name, payload.state)
+    if (type === 'reset')    { hasError = false; retryBtn.classList.remove('visible') }
+  })
+</script>
+</body>
+</html>
