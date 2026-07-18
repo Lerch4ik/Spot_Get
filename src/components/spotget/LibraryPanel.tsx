@@ -7,6 +7,9 @@ import { useSpotgetStore, buildDownloadedTracks, buildImportedTracks } from '@/l
 import { translations } from '@/lib/i18n'
 import { AddToPlaylistButton } from './AddToPlaylistButton'
 import { TrackArtwork } from './TrackArtwork'
+import { VirtualList } from './VirtualList'
+import { TrackListControls, sortTracks, filterTracks, type TrackSortMode } from './TrackListControls'
+import { formatTime } from './MiniPlayer'
 
 type LibraryTab = 'downloaded' | 'imported'
 
@@ -23,6 +26,8 @@ export function LibraryPanel() {
   const t = translations[lang]
 
   const [activeTab, setActiveTab] = useState<LibraryTab>('downloaded')
+  const [search, setSearch] = useState('')
+  const [sort, setSort] = useState<TrackSortMode>('default')
 
   useEffect(() => {
     if (typeof window !== 'undefined' && window.electronAPI?.getLibraryDir) {
@@ -49,6 +54,9 @@ export function LibraryPanel() {
   const importedTracks = buildImportedTracks(libraryTracks)
 
   const currentTracks = activeTab === 'downloaded' ? downloadedTracks : importedTracks
+  // Apply the search + sort controls; the virtual list below renders only the
+  // visible rows, so even thousands of tracks scroll without lag.
+  const visibleTracks = sortTracks(filterTracks(currentTracks, search), sort)
 
   return (
     <div className="relative max-w-3xl mx-auto space-y-6 pb-12">
@@ -168,9 +176,14 @@ export function LibraryPanel() {
       ) : (
         <div className="space-y-1">
           <p className="text-xs text-muted-foreground mb-3">
-            {currentTracks.length} {t.tracks}
+            {visibleTracks.length} {t.tracks}
           </p>
-          {currentTracks.map((track: any) => (
+          <TrackListControls search={search} onSearch={setSearch} sort={sort} onSort={setSort} lang={lang} />
+          <VirtualList
+            items={visibleTracks}
+            itemHeight={68}
+            maxHeight="calc(100vh - 380px)"
+            renderItem={(track: any) => (
             <div key={track.id} className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/5 group transition-colors">
               <div className="w-10 h-10 rounded bg-green-500/20 flex items-center justify-center flex-shrink-0 overflow-hidden">
                 <TrackArtwork
@@ -184,13 +197,16 @@ export function LibraryPanel() {
                 <p className="text-sm font-medium truncate">{track.title}</p>
                 <p className="text-xs text-muted-foreground">{track.artist}</p>
               </div>
+              <span className="text-xs text-muted-foreground/60 flex-shrink-0">
+                {formatTime(track.duration)}
+              </span>
               <span className="text-xs text-muted-foreground bg-white/5 px-2 py-0.5 rounded">
                 {track.format}
               </span>
               <AddToPlaylistButton track={track} />
               <button
                 onClick={() => {
-                  playTrack(track, currentTracks)
+                  playTrack(track, visibleTracks)
                 }}
                 className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-white/10 text-green-400"
                 title="Play"
@@ -198,7 +214,8 @@ export function LibraryPanel() {
                 <Play className="w-4 h-4" />
               </button>
             </div>
-          ))}
+            )}
+          />
         </div>
       )}
     </div>

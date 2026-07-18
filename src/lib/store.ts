@@ -3,7 +3,7 @@
 import { create } from "zustand"
 import type { Lang } from "./i18n"
 
-export type PanelType = "download" | "stats" | "history" | "settings" | "player" | "library"
+export type PanelType = "download" | "stats" | "history" | "settings" | "player" | "library" | "about"
 export type DownloadStatus = "pending" | "downloading" | "completed" | "failed" | "cancelled"
 export type SpotifyType = "song" | "album" | "playlist" | "artist"
 export type AudioFormat = "mp3" | "flac" | "ogg" | "wav"
@@ -218,6 +218,22 @@ export function setCachedDuration(id: string, duration: number) {
   }
 }
 
+/** Bulk version of setCachedDuration: one localStorage write for many tracks. */
+export function setCachedDurations(entries: Record<string, number>) {
+  const cache = getDurationCache()
+  let changed = false
+  for (const [id, duration] of Object.entries(entries)) {
+    if (!id || !duration || duration <= 0 || cache[id] === duration) continue
+    cache[id] = duration
+    changed = true
+  }
+  if (changed && typeof window !== "undefined") {
+    try {
+      localStorage.setItem(DURATION_CACHE_KEY, JSON.stringify(cache))
+    } catch {}
+  }
+}
+
 export function filePathToSpotgetUrl(filePath: string): string {
   if (!filePath) return ""
   const normalized = filePath.replace(/\\/g, "/")
@@ -346,6 +362,7 @@ interface SpotgetState {
   seek: (time: number) => void
   setCurrentTime: (time: number) => void
   updateTrackDuration: (trackId: string, duration: number) => void
+  updateTrackDurations: (updates: Record<string, number>) => void
   setVolume: (vol: number) => void
   toggleMute: () => void
   toggleRepeat: () => void
@@ -738,6 +755,20 @@ export const useSpotgetStore = create<SpotgetState>((set, get) => ({
       currentTrack: s.currentTrack?.id === trackId ? { ...s.currentTrack, duration } : s.currentTrack,
       libraryTracks: s.libraryTracks.map((t) => (t.id === trackId ? { ...t, duration } : t)),
       queue: s.queue.map((t) => (t.id === trackId ? { ...t, duration } : t)),
+    }))
+  },
+
+  // Bulk duration update — one store update (and one re-render) for a whole
+  // batch of measured tracks instead of hundreds of individual updates.
+  updateTrackDurations: (updates) => {
+    setCachedDurations(updates)
+    set((s) => ({
+      currentTrack:
+        s.currentTrack && updates[s.currentTrack.id]
+          ? { ...s.currentTrack, duration: updates[s.currentTrack.id] }
+          : s.currentTrack,
+      libraryTracks: s.libraryTracks.map((t) => (updates[t.id] ? { ...t, duration: updates[t.id] } : t)),
+      queue: s.queue.map((t) => (updates[t.id] ? { ...t, duration: updates[t.id] } : t)),
     }))
   },
 

@@ -8,17 +8,17 @@
 
 export const WHATS_NEW: { ru: string[]; en: string[] } = {
   ru: [
-    'Полностью новый современный дизайн всех страниц',
-    'Основная папка для музыки + свои подпапки для каждой скачки',
-    'Громкость теперь сохраняется после перезапуска',
-    'История и настройки больше не сбрасываются при обновлении',
-    'Это окошко «Что нового» — теперь оно будет показываться после каждого обновления',
+    'Огромный прирост производительности: все списки треков виртуализированы — больше никаких лагов, даже с тысячами треков',
+    'Поиск и сортировка на каждой странице с треками',
+    'Длительности треков теперь загружаются в фоне сразу при запуске приложения',
+    'Исправлено: скачанный плейлист показывал меньше треков, чем реально сохранено',
+    'Новый читаемый выпадающий список сортировки в тёмной теме',
   ],
   en: [
-    'Completely new modern design across all pages',
-    'Base music folder + custom subfolders for each download',
-    'Volume is now remembered between restarts',
-    'History and settings are no longer reset by updates',
-    'This “What’s new” window — shown once after every update',
+    'Huge performance boost: all track lists are now virtualized — no more lag, even with thousands of tracks',
+    'Search and sorting on every page with tracks',
+    'Track durations now load in the background from app startup',
+    'Fixed playlist downloads showing fewer tracks than were actually saved',
+    'New readable sort dropdown in dark theme',
   ],
 }

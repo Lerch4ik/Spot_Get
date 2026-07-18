@@ -2,10 +2,12 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, Trash2, Filter, Download as ExportIcon, Upload as ImportIcon } from 'lucide-react'
+import { Search, Trash2, Filter, ArrowUpDown, Download as ExportIcon, Upload as ImportIcon } from 'lucide-react'
 import { useSpotgetStore, type DownloadStatus, type SpotifyType, type Platform, getPlatformName, getPlatformColor } from '@/lib/store'
 import { translations } from '@/lib/i18n'
 import { HistoryItem } from './HistoryItem'
+import { VirtualList } from './VirtualList'
+import { PillSelect } from './TrackListControls'
 import { TypeChipSelect, PlatformChipSelect } from './ChipSelect'
 import { useToast } from '@/hooks/use-toast'
 
@@ -24,6 +26,7 @@ export function HistoryPanel() {
   const { toast } = useToast()
 
   const [localSearch, setLocalSearch] = useState(historyFilter.search)
+  const [histSort, setHistSort] = useState<'newest' | 'oldest' | 'title' | 'artist'>('newest')
 
   // Debounce search
   useEffect(() => {
@@ -34,7 +37,7 @@ export function HistoryPanel() {
   }, [localSearch, setHistoryFilter])
 
   const filteredDownloads = useMemo(() => {
-    return downloads.filter((d) => {
+    const base = downloads.filter((d) => {
       if (d.id.includes("-track-")) return false
       // Search filter
       if (historyFilter.search) {
@@ -53,7 +56,18 @@ export function HistoryPanel() {
       if (historyFilter.platform !== 'all' && d.platform !== historyFilter.platform) return false
       return true
     })
-  }, [downloads, historyFilter])
+    const byText = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: 'base' })
+    switch (histSort) {
+      case 'oldest':
+        return [...base].reverse()
+      case 'title':
+        return [...base].sort((a, b) => byText(a.title, b.title))
+      case 'artist':
+        return [...base].sort((a, b) => byText(a.artist || '', b.artist || '') || byText(a.title, b.title))
+      default:
+        return base
+    }
+  }, [downloads, historyFilter, histSort])
 
   const statusOptions: (DownloadStatus | 'all')[] = ['all', 'completed', 'downloading', 'pending', 'failed']
   const typeOptions: (SpotifyType | 'all')[] = ['all', 'song', 'album', 'playlist', 'artist']
@@ -166,8 +180,25 @@ export function HistoryPanel() {
             type="text"
             value={localSearch}
             onChange={(e) => setLocalSearch(e.target.value)}
-            placeholder={lang === 'ru' ? 'Поиск по названию или исполнителю...' : 'Search by title or artist...'}
+            placeholder={lang === 'ru' ? 'Поиск по на��ванию или исполнителю...' : 'Search by title or artist...'}
             className="w-full pl-11 pr-5 py-3 rounded-full text-sm text-white placeholder:text-white/20 outline-none transition-all backdrop-blur-xl border-[1.5px] border-white/10 bg-white/[0.045] focus:border-primary/40 focus:shadow-[0_0_28px_rgba(30,215,96,0.14)]"
+          />
+        </div>
+
+        {/* Sort */}
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-muted-foreground flex items-center gap-1.5">
+            <ArrowUpDown className="w-3 h-3" /> {lang === 'ru' ? 'Сортировка' : 'Sort'}
+          </label>
+          <PillSelect
+            value={histSort}
+            onChange={(v) => setHistSort(v as any)}
+            options={[
+              { value: 'newest', label: lang === 'ru' ? 'Сначала новые' : 'Newest first' },
+              { value: 'oldest', label: lang === 'ru' ? 'Сначала старые' : 'Oldest first' },
+              { value: 'title', label: lang === 'ru' ? 'По названию (А-Я)' : 'By title (A-Z)' },
+              { value: 'artist', label: lang === 'ru' ? 'По исполнителю (А-Я)' : 'By artist (A-Z)' },
+            ]}
           />
         </div>
 
@@ -223,29 +254,31 @@ export function HistoryPanel() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="space-y-2 max-h-[calc(100vh-400px)] overflow-y-auto pr-1"
       >
-        <AnimatePresence mode="popLayout">
-          {filteredDownloads.length > 0 ? (
-            filteredDownloads.map((item) => (
+        {filteredDownloads.length > 0 ? (
+          <VirtualList
+            items={filteredDownloads}
+            itemHeight={72}
+            maxHeight="calc(100vh - 400px)"
+            renderItem={(item) => (
               <HistoryItem
                 key={item.id}
                 item={item}
                 onRetry={(id) => retryDownload(id)}
                 onDelete={(id) => removeDownload(id)}
               />
-            ))
-          ) : (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-center py-12 text-muted-foreground"
-            >
-              <p className="text-sm">{lang === 'ru' ? 'Загрузки не найдены' : 'No downloads found'}</p>
-              <p className="text-xs mt-1">{lang === 'ru' ? 'Попробуйте изменить фильтры' : 'Try adjusting your filters'}</p>
-            </motion.div>
-          )}
-        </AnimatePresence>
+            )}
+          />
+        ) : (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-center py-12 text-muted-foreground"
+          >
+            <p className="text-sm">{lang === 'ru' ? 'Загрузки не найдены' : 'No downloads found'}</p>
+            <p className="text-xs mt-1">{lang === 'ru' ? 'Попробуйте изменить фильтры' : 'Try adjusting your filters'}</p>
+          </motion.div>
+        )}
       </motion.div>
     </div>
   )

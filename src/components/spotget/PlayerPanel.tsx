@@ -8,7 +8,8 @@ import { translations } from '@/lib/i18n'
 import { formatTime } from './MiniPlayer'
 import { AddToPlaylistButton } from './AddToPlaylistButton'
 import { TrackArtwork } from './TrackArtwork'
-import { useTrackDurations } from './useTrackDurations'
+import { VirtualList } from './VirtualList'
+import { TrackListControls, sortTracks, filterTracks, type TrackSortMode } from './TrackListControls'
 
 const PLAYLIST_COLORS = ['#1ed760', '#3498db', '#e74c3c', '#e67e22', '#9b59b6', '#1abc9c', '#f39c12', '#fa2d48', '#ff5500', '#ffcc00']
 
@@ -40,14 +41,17 @@ export function PlayerPanel() {
   const importedTracks = buildImportedTracks(libraryTracks)
   const allTracks = [...downloadedTracks, ...importedTracks]
 
-  // Lazily read real durations for any local tracks still showing 0:00.
-  useTrackDurations(allTracks)
+  // Track durations are scanned app-wide right at startup (see page.tsx).
 
   const likedTracks = allTracks.filter((tr) => likedTrackIds.has(tr.id))
 
   // Tab for the "All Tracks" section: downloaded vs imported (like My Library)
   const [tracksTab, setTracksTab] = useState<'downloaded' | 'imported'>('downloaded')
-  const visibleTracks = tracksTab === 'downloaded' ? downloadedTracks : importedTracks
+  const [trackSearch, setTrackSearch] = useState('')
+  const [trackSort, setTrackSort] = useState<TrackSortMode>('default')
+  const baseTracks = tracksTab === 'downloaded' ? downloadedTracks : importedTracks
+  // Search + sort applied here; the virtual list renders only visible rows.
+  const visibleTracks = sortTracks(filterTracks(baseTracks, trackSearch), trackSort)
 
   // Playlist creation state
   const [showCreatePlaylist, setShowCreatePlaylist] = useState(false)
@@ -594,8 +598,12 @@ export function PlayerPanel() {
           </p>
         )}
 
-        <div className="space-y-1 max-h-96 overflow-y-auto pr-1">
-          {visibleTracks.map((track: any, index: number) => {
+        <TrackListControls search={trackSearch} onSearch={setTrackSearch} sort={trackSort} onSort={setTrackSort} lang={lang} />
+        <VirtualList
+          items={visibleTracks}
+          itemHeight={60}
+          maxHeight={384}
+          renderItem={(track: any, index: number) => {
             const isCurrent = currentTrack?.id === track.id
             const isLiked = likedTrackIds.has(track.id)
             return (
@@ -654,8 +662,8 @@ export function PlayerPanel() {
                 </div>
               </motion.div>
             )
-          })}
-        </div>
+          }}
+        />
       </motion.div>
     </div>
   )

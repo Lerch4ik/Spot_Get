@@ -1785,6 +1785,8 @@ ipcMain.handle('download:start', async (event, { id, url, format, bitrate, concu
       // to complete the wrong card.
       const activeTracks = new Map()
       const completedTrackIds = new Set()  // Prevent double-completion
+      const usedFilePaths = new Set()      // Files already claimed by a track card
+      const downloadStartMs = Date.now()   // For the end-of-download disk reconcile
       // De-dupe cards: spotdl reprints "Artist - Title: Downloading" once per
       // audio source (youtube-music, youtube) and per retry (--max-retries),
       // and can reprint skip lines too. Without this, the SAME track spawned a
@@ -1895,6 +1897,9 @@ ipcMain.handle('download:start', async (event, { id, url, format, bitrate, concu
           return
         }
         completedTrackIds.add(trackId)
+        // Remember the claimed file so the end-of-download disk reconcile
+        // never registers the same file under a second card.
+        try { usedFilePaths.add(path.normalize(filePath).toLowerCase()) } catch (_) {}
 
         // Read real title/artist from the filename — spotdl saves as "Artist - Title.ext"
         // and the filename contains correct Cyrillic even when stdout encoding lost it
@@ -2323,6 +2328,58 @@ ipcMain.handle('download:start', async (event, { id, url, format, bitrate, concu
           }
         } catch (_) {}
         cleanupLegacyCacheFolders(outDir)
+
+        // ── Reconcile the track list with the ACTUAL files on disk ──────
+        // Track cards are built by parsing spotdl's text output, which can
+        // differ between machines (spotdl version, console encoding, progress
+        // bars overwriting lines with \r). A track that downloaded fine but
+        // was never announced in a parseable stdout line would silently miss
+        // from the app — e.g. a 200-track playlist showing only 20 entries
+        // while the folder holds all 200 files. Here we scan the output
+        // folder and register every fresh audio file that has no card yet.
+        if (!downloadSession.cancelled) {
+          try {
+            const exts = ['.mp3', '.flac', '.ogg', '.wav', '.m4a']
+            const freshFiles = fs.readdirSync(outDir)
+              .filter((f) => exts.includes(path.extname(f).toLowerCase()))
+              .map((f) => path.join(outDir, f))
+              .filter((full) => {
+                // Only files written during THIS download session (5s grace),
+                // so pre-existing files in the folder are never re-listed.
+                try { return fs.statSync(full).mtimeMs >= downloadStartMs - 5000 } catch (_) { return false }
+              })
+              .filter((full) => !usedFilePaths.has(path.normalize(full).toLowerCase()))
+            if (freshFiles.length > 0) {
+              flog(`[reconcile] ${freshFiles.length} downloaded file(s) had no track card — registering them now`)
+            }
+            for (const full of freshFiles) {
+              const basename = path.basename(full, path.extname(full))
+              const sepIdx = basename.indexOf(' - ')
+              const rArtist = sepIdx > 0 ? basename.substring(0, sepIdx).trim() : ''
+              const rTitle  = sepIdx > 0 ? basename.substring(sepIdx + 3).trim() : basename.trim()
+              const trackId = `${id}-track-${trackIndexCounter++}`
+              trackToParentMap.set(trackId, id)
+              if (!event.sender.isDestroyed()) {
+                event.sender.send('download:newTrack', {
+                  parentId: id,
+                  id: trackId,
+                  title: rTitle || basename,
+                  artist: rArtist,
+                  platform,
+                  format,
+                  bitrate,
+                  artwork: null,
+                })
+              }
+              // markTrackDone reads tags/artwork, computes size and emits
+              // download:trackCompleted — the exact same path a normally
+              // detected track takes, so the UI can't tell the difference.
+              markTrackDone(trackId, rTitle || basename, rArtist, full)
+            }
+          } catch (err) {
+            flog(`[reconcile] disk scan failed: ${err.message}`)
+          }
+        }
 
         const actuallyDownloaded = completedTrackIds.size
         // Reconcile the total to reality: spotdl sometimes reports a "Found N"

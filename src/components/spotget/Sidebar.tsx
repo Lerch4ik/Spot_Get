@@ -7,6 +7,7 @@ import {
   BarChart3,
   History,
   Settings,
+  Info,
   Menu,
   X,
   ChevronRight,
@@ -27,6 +28,7 @@ const navItems: { id: PanelType; icon: React.ReactNode }[] = [
   { id: 'history', icon: <History className="w-5 h-5" /> },
   { id: 'library', icon: <ListMusic className="w-5 h-5" /> },
   { id: 'settings', icon: <Settings className="w-5 h-5" /> },
+  { id: 'about', icon: <Info className="w-5 h-5" /> },
 ]
 
 export function Sidebar() {
@@ -48,6 +50,7 @@ export function Sidebar() {
     history: t.history,
     library: t.myLibrary,
     settings: t.settings,
+    about: lang === 'ru' ? 'О проекте' : 'About',
   }
 
   useEffect(() => {
@@ -238,7 +241,7 @@ export function Sidebar() {
             <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
             <span>{lang === 'ru' ? 'Система активна' : 'System Online'}</span>
           </div>
-          <p className="text-[9px] text-muted-foreground/50 mt-1">v{currentVersion || '2.8.4'} • spotdl powered</p>
+          <p className="text-[9px] text-muted-foreground/50 mt-1">v{currentVersion || '2.8.5'} • spotdl powered</p>
         </div>
       </motion.aside>
     </>

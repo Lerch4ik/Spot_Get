@@ -312,6 +312,9 @@ export function DownloadPanel() {
   // session or app restart) are promoted to top-level so downloaded files
   // never disappear from the list.
   const existingIds = new Set(downloads.map((d) => d.id))
+  // Cap how many download cards are rendered at once — a 500-track playlist
+  // would otherwise mount hundreds of animated cards and freeze the UI.
+  const [shownCards, setShownCards] = useState(60)
   const visibleDownloads = downloads.filter((d) => {
     if (d.parentId && existingIds.has(d.parentId)) return false
     return true
@@ -634,6 +637,7 @@ export function DownloadPanel() {
                   if (!aActive && bActive) return 1
                   return (b.createdAt || 0) - (a.createdAt || 0)
                 })
+                .slice(0, shownCards)
                 .map((item) => (
                   <DownloadCard
                     key={item.id}
@@ -644,6 +648,15 @@ export function DownloadPanel() {
                 ))
             )}
           </AnimatePresence>
+          {visibleDownloads.length > shownCards && (
+            <button
+              type="button"
+              onClick={() => setShownCards((n) => n + 100)}
+              className="w-full mt-2 py-2.5 rounded-full text-xs font-medium text-white/55 hover:text-white border border-white/10 bg-white/[0.03] transition-colors"
+            >
+              {ru ? `Показать ещё (${visibleDownloads.length - shownCards})` : `Show more (${visibleDownloads.length - shownCards})`}
+            </button>
+          )}
         </div>
       </motion.section>
 

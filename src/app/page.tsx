@@ -1,7 +1,8 @@
 'use client'
 
+import { useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { useSpotgetStore } from '@/lib/store'
+import { useSpotgetStore, buildDownloadedTracks, buildImportedTracks } from '@/lib/store'
 import { useAudio } from '@/hooks/useAudio'
 import { TitleBar } from '@/components/spotget/TitleBar'
 import { Sidebar } from '@/components/spotget/Sidebar'
@@ -14,7 +15,9 @@ import { StatsPanel } from '@/components/spotget/StatsPanel'
 import { HistoryPanel } from '@/components/spotget/HistoryPanel'
 import { LibraryPanel } from '@/components/spotget/LibraryPanel'
 import { SettingsPanel } from '@/components/spotget/SettingsPanel'
+import { AboutPanel } from '@/components/spotget/AboutPanel'
 import { WhatsNewModal } from '@/components/spotget/WhatsNewModal'
+import { useTrackDurations } from '@/components/spotget/useTrackDurations'
 import { Toaster } from '@/components/ui/toaster'
 
 const panels = {
@@ -24,11 +27,31 @@ const panels = {
   history: HistoryPanel,
   library: LibraryPanel,
   settings: SettingsPanel,
+  about: AboutPanel,
 } as const
 
 export default function Page() {
   // Mount the shared <audio> engine so playback works app-wide.
   useAudio()
+
+  const downloads = useSpotgetStore((s) => s.downloads)
+  const libraryTracks = useSpotgetStore((s) => s.libraryTracks)
+  const loadLibrary = useSpotgetStore((s) => s.loadLibrary)
+
+  // Load the imported library RIGHT AT APP START (previously it only loaded
+  // when the Library tab was first opened), so every list is ready instantly.
+  useEffect(() => {
+    if (typeof window !== 'undefined' && (window as any).electronAPI?.getLibraryDir) {
+      ;(window as any).electronAPI.getLibraryDir().then((result: any) => {
+        if (result?.tracks?.length) loadLibrary(result.tracks, result.folder || '')
+      })
+    }
+  }, [loadLibrary])
+
+  // Scan missing track durations in the background from the moment the app
+  // opens — not only while the Player tab is visible — so durations appear
+  // everywhere (queue, library, player) without waiting.
+  useTrackDurations([...buildDownloadedTracks(downloads), ...buildImportedTracks(libraryTracks)])
 
   const activePanel = useSpotgetStore((s) => s.activePanel)
   const isPlayerOpen = useSpotgetStore((s) => s.isPlayerOpen)
