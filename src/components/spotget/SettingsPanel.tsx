@@ -420,7 +420,7 @@ export function SettingsPanel() {
         <div className="space-y-2 text-xs text-muted-foreground">
           <div className="flex justify-between">
             <span>{lang === 'ru' ? 'Версия' : 'Version'}</span>
-            <span className="font-mono">{currentVersion || '2.7.5'}</span>
+            <span className="font-mono">{currentVersion || '2.8.0'}</span>
           </div>
           <div className="flex justify-between">
             <span>{lang === 'ru' ? 'Движок' : 'Engine'}</span>

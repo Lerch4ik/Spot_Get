@@ -1,6 +1,6 @@
 {
   "name": "spot",
-  "version": "2.7.5",
+  "version": "2.8.0",
   "private": true,
   "description": "Spot — music downloader",
   "author": "Lerch4ik",
@@ -12,8 +12,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "dist": "node scripts/patch-nsis.js && next build && electron-builder --win --x64",
-    "postinstall": "node scripts/patch-nsis.js"
+    "dist": "next build && electron-builder --win --x64"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",

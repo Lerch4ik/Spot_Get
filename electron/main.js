@@ -2493,30 +2493,83 @@ ipcMain.handle('update:download', async (event) => {
 
     try {
       if (process.platform === 'win32') {
-        // wscript.exe + VBS — запуск без окна консоли.
-        // Цикл taskkill гарантирует, что установщик стартует только после
-        // РЕАЛЬНОГО завершения всех процессов Spot.exe.
-        const vbsPath = path.join(app.getPath('temp'), 'spot_update.vbs')
-        // В VBS-строках экранируются только двойные кавычки (удвоением).
+        // wscript.exe + VBS + mshta: тихая установка с современным окном.
+        const tempDir = app.getPath('temp')
+        const htaPath = path.join(tempDir, 'spot_update.hta')
+        const flagPath = path.join(tempDir, 'spot_update_done.flag')
+        try { if (fs.existsSync(flagPath)) fs.unlinkSync(flagPath) } catch (_) {}
+
+        // Безрамочное окно обновления (без системного заголовка/навбара).
+        // Русский текст задан HTML-сущностями (&#XXXX;) = чистый ASCII, поэтому
+        // кодировка не может "поехать" независимо от того, как сохранён файл.
+        // Без <!DOCTYPE> и без x-ua-compatible: только так mshta применяет
+        // border=none / caption=no и убирает системную рамку окна.
+        const flagForHta = flagPath.replace(/\\/g, '\\\\')
+        const htaContent = [
+          '<html>',
+          '<head>',
+          '<hta:application id="spotUp" application="yes" border="none" caption="no" sysmenu="no" maximizebutton="no" minimizebutton="no" showintaskbar="no" scroll="no" contextmenu="no" selection="no" innerborder="no"></hta:application>',
+          '<meta http-equiv="Content-Type" content="text/html; charset=utf-8">',
+          '<title>Spot</title>',
+          '<style>',
+          'html,body{margin:0;padding:0;height:100%;background:#101312;overflow:hidden;font-family:"Segoe UI",Arial,sans-serif;}',
+          '.wrap{padding:26px 30px;}',
+          '.logo{width:56px;height:56px;background:#1DB954;text-align:center;line-height:56px;font-size:30px;color:#101312;font-weight:bold;}',
+          '.logocell{vertical-align:middle;}',
+          '.metacell{vertical-align:middle;padding-left:16px;}',
+          '.title{color:#ffffff;font-size:20px;font-weight:bold;}',
+          '.sub{color:#9aa3a0;font-size:13px;margin-top:5px;}',
+          '.barbg{margin-top:24px;height:6px;background:#26302c;position:relative;overflow:hidden;}',
+          '.bar{position:absolute;top:0px;left:-40%;width:40%;height:6px;background:#1DB954;}',
+          '.hint{color:#5f6b66;font-size:11px;margin-top:16px;}',
+          '</style>',
+          '</head>',
+          '<body>',
+          '<div class="wrap">',
+          '<table cellpadding="0" cellspacing="0" border="0"><tr>',
+          '<td class="logocell"><div class="logo">&#9835;</div></td>',
+          '<td class="metacell"><div class="title">Spot</div><div class="sub">&#1059;&#1089;&#1090;&#1072;&#1085;&#1072;&#1074;&#1083;&#1080;&#1074;&#1072;&#1077;&#1084; &#1086;&#1073;&#1085;&#1086;&#1074;&#1083;&#1077;&#1085;&#1080;&#1077;&#8230;</div></td>',
+          '</tr></table>',
+          '<div class="barbg"><div class="bar" id="bar"></div></div>',
+          '<div class="hint">&#1055;&#1088;&#1080;&#1083;&#1086;&#1078;&#1077;&#1085;&#1080;&#1077; &#1079;&#1072;&#1087;&#1091;&#1089;&#1090;&#1080;&#1090;&#1089;&#1103; &#1072;&#1074;&#1090;&#1086;&#1084;&#1072;&#1090;&#1080;&#1095;&#1077;&#1089;&#1082;&#1080;</div>',
+          '</div>',
+          '<script language="javascript">',
+          'window.resizeTo(430,196);',
+          'window.moveTo(Math.floor((screen.availWidth-430)/2),Math.floor((screen.availHeight-196)/2));',
+          'var b=document.getElementById("bar");var p=-40;',
+          'setInterval(function(){p+=4;if(p>100){p=-40;}b.style.left=p+"%";},60);',
+          'try{var fso=new ActiveXObject("Scripting.FileSystemObject");var flag="' + flagForHta + '";setInterval(function(){try{if(fso.FileExists(flag)){window.close();}}catch(e){}},700);}catch(e){}',
+          '</script>',
+          '</body>',
+          '</html>'
+        ].join('\r\n')
+        fs.writeFileSync(htaPath, htaContent, 'utf8')
+
+        const vbsPath = path.join(tempDir, 'spot_update.vbs')
         const escapedDest = dest.replace(/"/g, '""')
+        const escapedHta = htaPath.replace(/"/g, '""')
+        const escapedFlag = flagPath.replace(/"/g, '""')
+        const escapedExe = process.execPath.replace(/"/g, '""')
         const vbsContent = [
           'Set sh = CreateObject("WScript.Shell")',
+          'Set fso = CreateObject("Scripting.FileSystemObject")',
+          'sh.Run "mshta.exe ""' + escapedHta + '""", 0, False',
           'WScript.Sleep 2000',
-          "' Гасим внешние тулзы, которые могут держать файлы открытыми",
           'sh.Run "taskkill /F /IM spotdl.exe /T", 0, True',
           'sh.Run "taskkill /F /IM yt-dlp.exe /T", 0, True',
           'sh.Run "taskkill /F /IM ffmpeg.exe /T", 0, True',
-          "' Повторяем taskkill, пока жив хоть один Spot.exe (включая",
-          "' дочерний Next.js-сервер, который тоже называется Spot.exe).",
-          "' taskkill возвращает не 0, когда убивать больше нечего.",
           'For i = 1 To 15',
           '  rc = sh.Run("taskkill /F /IM Spot.exe /T", 0, True)',
           '  If rc <> 0 Then Exit For',
           '  WScript.Sleep 1000',
           'Next',
-          "' Пауза: Windows/антивирус может держать lock ещё пару секунд",
           'WScript.Sleep 2000',
-          `sh.Run """${escapedDest}""", 1, False`
+          'sh.Run """' + escapedDest + '"" /S", 0, True',
+          'On Error Resume Next',
+          'fso.CreateTextFile("' + escapedFlag + '", True).Close',
+          'On Error GoTo 0',
+          'WScript.Sleep 800',
+          'sh.Run """' + escapedExe + '""", 1, False'
         ].join('\r\n')
         fs.writeFileSync(vbsPath, vbsContent, 'utf8')
         const child = spawn('wscript.exe', [vbsPath], {
@@ -2526,7 +2579,6 @@ ipcMain.handle('update:download', async (event) => {
         })
         child.unref()
       } else {
-        // macOS / Linux: аналогичная задержка через sh
         const child = spawn(
           'sh',
           ['-c', `sleep 10 && "${dest}"`],
