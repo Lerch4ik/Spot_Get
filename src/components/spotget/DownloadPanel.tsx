@@ -118,11 +118,12 @@ export function DownloadPanel() {
     addDownloadSessionId, clearDownloadSessionIds,
     totalTracksCount, setTotalTracksCount,
     completedTracksCount, setCompletedTracksCount,
+    settings,
   } = useSpotgetStore()
 
   const [url, setUrl]             = useState("")
-  const [format, setFormat]       = useState<any>("mp3")
-  const [bitrate, setBitrate]     = useState<any>("320k")
+  const [format, setFormat]       = useState<any>(settings.defaultFormat || "mp3")
+  const [bitrate, setBitrate]     = useState<any>(settings.defaultBitrate || "320k")
   const [preparing, setPreparing] = useState(false)
   const [platform, setPlatform]   = useState<Platform>("unknown")
   const [pasted, setPasted]       = useState(false)
@@ -146,6 +147,16 @@ export function DownloadPanel() {
   // ── IPC listeners — SINGLE source of truth (store.ts bottom block removed) ──
   // ── IPC bridge — singleton, survives panel unmounts ────────────────
   useEffect(() => { initIpcBridge() }, [])
+
+  // Follow the default format/bitrate configured in Settings. These change
+  // only when the user edits them in the Settings panel, so mirroring them
+  // here gives new downloads the chosen defaults.
+  useEffect(() => {
+    if (settings.defaultFormat) setFormat(settings.defaultFormat)
+  }, [settings.defaultFormat])
+  useEffect(() => {
+    if (settings.defaultBitrate) setBitrate(settings.defaultBitrate)
+  }, [settings.defaultBitrate])
 
 
   const handleStart = async () => {

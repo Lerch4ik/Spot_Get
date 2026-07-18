@@ -33,7 +33,53 @@ export function initIpcBridge() {
   console.log('[initIpcBridge] initialising IPC listeners...')
   ;(window as any).__spotgetIpcBridgeInitialised = true
 
+  // ── Hydrate persisted settings ─────────────────────────────────
+  // The renderer store starts from in-code defaults; pull the values the
+  // user saved earlier (default format/bitrate, output folder, skip-existing,
+  // theme) back out of electron-store so their preferences survive restarts.
+  try {
+    Promise.resolve(api.getStore?.('settings')).then((saved: any) => {
+      if (saved && typeof saved === 'object') {
+        useSpotgetStore.getState().updateSettings(saved)
+      }
+    }).catch(() => {})
+  } catch {}
+
+  // ── Theme ──────────────────────────────────────────────────────────
+  // Apply the saved theme to <html> on startup and whenever the setting
+  // changes. Previously the .light/.dark class was only touched while the
+  // Settings panel was mounted, so the toggle appeared to do nothing.
+  const applyTheme = (theme?: string) => {
+    const html = document.documentElement
+    if (theme === 'light') {
+      html.classList.add('light')
+      html.classList.remove('dark')
+    } else {
+      html.classList.add('dark')
+      html.classList.remove('light')
+    }
+  }
+  applyTheme(useSpotgetStore.getState().settings.theme)
+  useSpotgetStore.subscribe((state) => applyTheme(state.settings.theme))
+
   // ── new track ──────────────────────────────────────────────────
+  // Cross-run duplicate guard: re-running the same playlist re-reports tracks
+  // that are already in the list from a previous run (files skipped because
+  // they already exist on disk). Without this, every run added another
+  // identical "Title / Artist" card.
+  const normTA = (s: string) => (s || "").toLowerCase().replace(/[^a-zа-яё0-9]+/gi, "")
+  const findDuplicateCards = (title: string, artist: string, excludeId: string) => {
+    // Never dedupe placeholder/empty titles — different unknown tracks would merge.
+    if (!normTA(title) || title === "Unknown Track") return []
+    const key = normTA(title) + "__" + normTA(artist)
+    return useSpotgetStore.getState().downloads.filter(
+      (d: any) =>
+        d.id !== excludeId &&
+        d.status === "completed" &&
+        normTA(d.title) + "__" + normTA(d.artist) === key,
+    )
+  }
+
   api.onNewTrack((data: any) => {
     const state = useSpotgetStore.getState()
     // Filter out garbage-only strings like "-", ",", "  -  ,"
@@ -128,6 +174,13 @@ export function initIpcBridge() {
       ...(data.fileSize ? { fileSize: data.fileSize } : {}),
       ...(typeof data.fileSizeBytes === "number" ? { fileSizeBytes: data.fileSizeBytes } : {}),
     })
+    // Remove older cards of the same track left over from previous runs.
+    if (!isGarbage(cleanTitle)) {
+      for (const dup of findDuplicateCards(cleanTitle, cleanArtist, data.id)) {
+        console.log(`[dedupe] removing older duplicate card id=${dup.id} title="${dup.title}"`)
+        state.removeDownload(dup.id)
+      }
+    }
   })
 
   // ── track skipped ──────────────────────────────────────────────
@@ -146,6 +199,12 @@ export function initIpcBridge() {
     }
 
     if (!state.downloads.some((d) => d.id === data.id)) {
+      // Same track already in the list from a previous run — don't add
+      // another identical card.
+      if (findDuplicateCards(cleanTitle, cleanArtist, data.id).length > 0) {
+        console.log(`[dedupe] skip card suppressed — "${cleanTitle}" already in list`)
+        return
+      }
       const parent = state.downloads.find((d) => d.id === data.parentId)
       state.addDownload({
         id: data.id,

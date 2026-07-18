@@ -1293,7 +1293,7 @@ function resolveDownloadParentId(id) {
 }
 
 // ── IPC: Download logic ──
-ipcMain.handle('download:start', async (event, { id, url, format, bitrate, skipExisting, concurrency }) => {
+ipcMain.handle('download:start', async (event, { id, url, format, bitrate, concurrency }) => {
   console.log(`[download:start] ID=${id} URL=${url} format=${format} bitrate=${bitrate}`)
   
   const spotdlBin = findSpotdl()
@@ -1314,6 +1314,8 @@ ipcMain.handle('download:start', async (event, { id, url, format, bitrate, skipE
 
   const cleanUrl = url.trim()
   const br = bitrate || '320k'
+  // "Skip Existing Downloads" setting (Advanced): default ON when unset.
+  const skipExisting = settings.skipExisting !== false
 
   const isYtdlpOnly = ['yandex', 'soundcloud', 'youtube'].includes(platform)
 
@@ -1326,6 +1328,8 @@ ipcMain.handle('download:start', async (event, { id, url, format, bitrate, skipE
       '--audio-quality', br === '320k' ? '0' : br === '256k' ? '2' : br === '192k' ? '4' : '9',
       '-o', path.join(outDir, '%(title)s - %(artist,creator)s.%(ext)s'),
       '--newline',
+      // Skip Existing: tell yt-dlp not to overwrite files that already exist.
+      ...(skipExisting ? ['--no-overwrites'] : ['--force-overwrites']),
       cleanUrl
     ]
     console.log('[yt-dlp]', ytdlpBin, args.join(' '))
@@ -1393,6 +1397,8 @@ ipcMain.handle('download:start', async (event, { id, url, format, bitrate, skipE
       '--output', outDir,
       '--format', (format || 'mp3').toLowerCase(),
       '--bitrate', br,
+      // Skip Existing: skip songs whose output file already exists (else re-download).
+      '--overwrite', skipExisting ? 'skip' : 'force',
       '--log-level', 'INFO',
       '--threads', String(concurrency),
       '--simple-tui',
@@ -1462,16 +1468,48 @@ ipcMain.handle('download:start', async (event, { id, url, format, bitrate, skipE
     activeDownloads.set(id, downloadSession)
 
     return new Promise((resolve) => {
-      const { StringDecoder } = require('string_decoder')
-      const decoder = new StringDecoder('utf8')
-      let stdoutBuffer = ''
+      // spotdl.exe on Windows can print Cyrillic in the legacy ANSI codepage
+      // (windows-1251) even though we request UTF-8 via PYTHONIOENCODING.
+      // Decoding those bytes as UTF-8 produced replacement characters that
+      // cleanText() stripped, so track titles arrived blank
+      // ("Zheka -    : Downloading") — which broke card matching and
+      // de-duplication. Buffer raw bytes, split into complete lines, then
+      // decode each line as strict UTF-8 with a windows-1251 fallback.
+      const utf8Strict = new TextDecoder('utf-8', { fatal: true })
+      const cp1251Decoder = new TextDecoder('windows-1251')
+      const decodeLine = (buf) => {
+        try { return utf8Strict.decode(buf) }
+        catch (_) { try { return cp1251Decoder.decode(buf) } catch (_) { return buf.toString('utf8') } }
+      }
+      const splitBufferLines = (buf) => {
+        const out = []
+        let start = 0
+        for (let i = 0; i < buf.length; i++) {
+          const b = buf[i]
+          if (b === 0x0A || b === 0x0D) { // \n or \r (in-place progress updates)
+            if (i > start) out.push(buf.subarray(start, i))
+            start = i + 1
+          }
+        }
+        return { lines: out, rest: Buffer.from(buf.subarray(start)) }
+      }
+      let stdoutBytes = Buffer.alloc(0)
+      let stderrBytes = Buffer.alloc(0)
       let errStr = ''
       let failedTracks = 0
       let lastErrorLine = ''
       // yt-dlp fallback queue: spotdl prints the failed YouTube URL on the
       // line right after "AudioProviderError: YT-DLP download error -"
       let failedUrls = []
+      const queuedFallbackUrls = new Set()  // de-dupe: spotdl reprints the same failed URL on every retry/source
       let expectFailedUrl = false
+      let expectSuccessUrl = false
+      // URLs that spotdl DID download successfully (possibly after retries).
+      // spotdl retries failed tracks up to --max-retries times: an early
+      // attempt can fail (queueing the URL for the yt-dlp fallback) and a
+      // later retry can succeed. Without this set the fallback re-downloaded
+      // such tracks, creating "Title (1).mp3" duplicates.
+      const succeededUrls = new Set()
       let fbIndex = 0            // next queue position the worker will take
       let fbSucceeded = 0
       let fbPromise = null       // current worker run (for awaiting drain on close)
@@ -1535,6 +1573,12 @@ ipcMain.handle('download:start', async (event, { id, url, format, bitrate, skipE
 
         while (fbIndex < failedUrls.length && !downloadSession.cancelled) {
           const i = fbIndex++
+          // Skip tracks that spotdl managed to download on a later retry —
+          // re-downloading them created "Title (1).mp3" duplicates.
+          if (succeededUrls.has(failedUrls[i])) {
+            flog(`[fallback] #${i + 1} already downloaded by spotdl — skipping`)
+            continue
+          }
           // music.youtube.com links often stay blocked; plain youtube.com works more often
           const url = failedUrls[i].replace('music.youtube.com', 'www.youtube.com')
           const trackId = `${id}-fb-${i}`
@@ -1636,22 +1680,25 @@ ipcMain.handle('download:start', async (event, { id, url, format, bitrate, skipE
             // track spotdl already saved). Because the temp folder held only
             // this track, there is zero ambiguity about which file it is.
             let finalPath = null
+            let duplicateOfExisting = false
             try {
               const exts = ['.mp3', '.flac', '.ogg', '.wav', '.m4a', '.opus']
               const produced = fs.readdirSync(fbTmpDir)
                 .filter(f => exts.includes(path.extname(f).toLowerCase()))
               if (produced.length > 0) {
                 const srcPath = path.join(fbTmpDir, produced[0])
-                let destPath = path.join(outDir, produced[0])
-                // Avoid clobbering an already-downloaded track with the same name
-                if (fs.existsSync(destPath) && path.resolve(destPath) !== path.resolve(srcPath)) {
-                  const ext = path.extname(produced[0])
-                  const base = path.basename(produced[0], ext)
-                  destPath = path.join(outDir, `${base} (${i + 1})${ext}`)
+                const destPath = path.join(outDir, produced[0])
+                if (succeededUrls.has(failedUrls[i]) || fs.existsSync(destPath)) {
+                  // spotdl saved this track itself (e.g. a retry succeeded
+                  // while we were downloading) — discard our copy instead of
+                  // creating a "Title (1).mp3" duplicate.
+                  duplicateOfExisting = true
+                  flog(`[fallback] #${i + 1} — track already saved by spotdl, discarding duplicate`)
+                } else {
+                  try { fs.renameSync(srcPath, destPath) }
+                  catch (_) { fs.copyFileSync(srcPath, destPath) }
+                  finalPath = destPath
                 }
-                try { fs.renameSync(srcPath, destPath) }
-                catch (_) { fs.copyFileSync(srcPath, destPath) }
-                finalPath = destPath
               }
             } catch (e) {
               flog(`[fallback] move failed for #${i + 1}: ${e.message}`)
@@ -1664,6 +1711,12 @@ ipcMain.handle('download:start', async (event, { id, url, format, bitrate, skipE
               // Pass the EXACT file path so completion is never associated with
               // another track's file (fixes duplicates + stuck cards).
               markTrackDone(trackId, '', '', finalPath)
+            } else if (duplicateOfExisting) {
+              if (!event.sender.isDestroyed()) {
+                event.sender.send('download:trackCompleted', {
+                  id: trackId, title: `Уже скачан — дубликат пропущен`, artist: '',
+                })
+              }
             } else {
               flog(`[fallback] track #${i + 1} reported OK but no audio file found`)
               if (!event.sender.isDestroyed()) {
@@ -1699,6 +1752,12 @@ ipcMain.handle('download:start', async (event, { id, url, format, bitrate, skipE
       // to complete the wrong card.
       const activeTracks = new Map()
       const completedTrackIds = new Set()  // Prevent double-completion
+      // De-dupe cards: spotdl reprints "Artist - Title: Downloading" once per
+      // audio source (youtube-music, youtube) and per retry (--max-retries),
+      // and can reprint skip lines too. Without this, the SAME track spawned a
+      // brand-new identical card every time. Key by normalized artist+title.
+      const seenTrackKeys = new Map()  // normKey -> trackId
+      const normKey = (s) => (s || '').toLowerCase().replace(/[^a-zа-яё0-9]+/gi, '')
       let currentTrackId = null  // kept for close() fallback only
       let currentTitle   = ''
       let currentArtist  = ''
@@ -1852,15 +1911,11 @@ ipcMain.handle('download:start', async (event, { id, url, format, bitrate, skipE
       }
 
       proc.stdout.on('data', (chunk) => {
-        // Decode chunk via StringDecoder to avoid splitting multi-byte Cyrillic
-        stdoutBuffer += decoder.write(chunk)
-
-        // Normalize line endings: spotdl on Windows uses \r for in-place
-        // progress updates which can corrupt line splitting
-        stdoutBuffer = stdoutBuffer.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
-
-        const lines = stdoutBuffer.split('\n')
-        stdoutBuffer = lines.pop() || ''
+        // Buffer raw bytes and split into complete lines; each line is
+        // decoded as strict UTF-8 with a windows-1251 fallback (see above).
+        const split = splitBufferLines(Buffer.concat([stdoutBytes, chunk]))
+        stdoutBytes = split.rest
+        const lines = split.lines.map(decodeLine)
 
         for (let rawLine of lines) {
           const line = cleanText(rawLine)
@@ -1875,7 +1930,23 @@ ipcMain.handle('download:start', async (event, { id, url, format, bitrate, skipE
           if (/AudioProviderError|LookupError|FFmpegError|Traceback/i.test(line)) {
             failedTracks++
             lastErrorLine = line
-            expectFailedUrl = /AudioProviderError/i.test(line)
+            expectSuccessUrl = false
+            // If the failed URL is on the SAME line, queue it directly and do
+            // not wait for the next bare-URL line (which, with --threads 4,
+            // could belong to a DIFFERENT, successful track).
+            const sameLineUrl = /AudioProviderError/i.test(line) ? line.match(/https?:\/\/\S+/) : null
+            if (sameLineUrl) {
+              expectFailedUrl = false
+              const failedUrl = sameLineUrl[0]
+              if (!succeededUrls.has(failedUrl) && !queuedFallbackUrls.has(failedUrl)) {
+                queuedFallbackUrls.add(failedUrl)
+                failedUrls.push(failedUrl)
+                flog(`[spotdl] queued for yt-dlp fallback (same line): ${failedUrl}`)
+                kickFallbackWorker()
+              }
+            } else {
+              expectFailedUrl = /AudioProviderError/i.test(line)
+            }
             flog(`[spotdl FAILED track #${failedTracks}] ${line}`)
             if (!event.sender.isDestroyed()) {
               // Carry the reason once; emitStats keeps the net failed count in sync.
@@ -1885,13 +1956,34 @@ ipcMain.handle('download:start', async (event, { id, url, format, bitrate, skipE
                 reason: line,
               })
             }
-          } else if (expectFailedUrl && /^https?:\/\//.test(line)) {
-            // Queue the failed YouTube URL and start the fallback worker
-            // immediately (runs concurrently with spotdl).
-            failedUrls.push(line.trim())
-            expectFailedUrl = false
-            flog(`[spotdl] queued for yt-dlp fallback: ${line.trim()}`)
-            kickFallbackWorker()
+          } else if (/^https?:\/\//.test(line)) {
+            const bareUrl = line.trim()
+            if (expectSuccessUrl) {
+              // URL right after a `Downloaded "..."` line = the track DID
+              // download. Remember it so the yt-dlp fallback never
+              // re-downloads it (a failed early attempt may have queued this
+              // URL, then a spotdl retry succeeded → "Title (1).mp3" dupes).
+              expectSuccessUrl = false
+              expectFailedUrl = false
+              succeededUrls.add(bareUrl)
+            } else if (expectFailedUrl) {
+              // Queue the failed YouTube URL and start the fallback worker
+              // immediately (runs concurrently with spotdl).
+              expectFailedUrl = false
+              // De-dupe: spotdl prints the SAME failed URL again on every retry
+              // (--max-retries) and every audio source. Without this, the same
+              // track was queued — and later shown — multiple times.
+              if (succeededUrls.has(bareUrl)) {
+                flog(`[spotdl] URL already downloaded — not queueing: ${bareUrl}`)
+              } else if (!queuedFallbackUrls.has(bareUrl)) {
+                queuedFallbackUrls.add(bareUrl)
+                failedUrls.push(bareUrl)
+                flog(`[spotdl] queued for yt-dlp fallback: ${bareUrl}`)
+                kickFallbackWorker()
+              } else {
+                flog(`[spotdl] duplicate failed URL ignored: ${bareUrl}`)
+              }
+            }
           }
 
           // 1. Общее число треков
@@ -1920,6 +2012,11 @@ ipcMain.handle('download:start', async (event, { id, url, format, bitrate, skipE
           // Also parse "Downloaded" format for tracks with empty titles:
           // Downloaded "Artist - Title": or Downloaded "Artist - ":
           const downloadedMatch = line.match(/^Downloaded\s+"(.+?)"\s*:\s*$/i)
+          if (downloadedMatch) {
+            // The next bare-URL line belongs to this SUCCESSFUL download.
+            expectSuccessUrl = true
+            expectFailedUrl = false
+          }
 
           // Helper: split "Artist - Title" — accepts empty/whitespace title.
           // YouTube tracks have no title in metadata so spotdl outputs "Artist -   :"
@@ -1951,6 +2048,7 @@ ipcMain.handle('download:start', async (event, { id, url, format, bitrate, skipE
             // Use artist as title fallback for YouTube tracks with empty metadata title
             // Strip trailing " -" or " -," from display (artifact of spotdl empty-title output)
             const cleanTrailing = (s) => s.replace(/\s*[\-,]+\s*$/, '').trim()
+            const hadRealTitle = !!(title && title.trim())
             if (!title) title = cleanTrailing(artist)
             artist = cleanTrailing(artist)
 
@@ -1960,12 +2058,30 @@ ipcMain.handle('download:start', async (event, { id, url, format, bitrate, skipE
               continue
             }
 
+            // ── De-dupe: spotdl reprints "Downloading" for the same track once
+            // per audio source and per retry. Reuse the existing card instead of
+            // spawning an identical duplicate (fixes repeated rows in the list).
+            // Only de-dupe when spotdl printed a REAL title. With an empty
+            // title the key collapsed to just the artist name, which merged
+            // DIFFERENT tracks by the same artist into one card — tracks went
+            // missing from the list.
+            const dupKey = hadRealTitle ? normKey(`${artist} ${title}`) : ''
+            if (dupKey && seenTrackKeys.has(dupKey)) {
+              const existingId = seenTrackKeys.get(dupKey)
+              currentTrackId = existingId
+              currentTitle = title
+              currentArtist = artist
+              console.log(`[spotdl dedupe newTrack] reuse ${existingId} for "${dupKey}"`)
+              continue
+            }
+
             const trackId = `${id}-track-${trackIndexCounter++}`
             trackToParentMap.set(trackId, id)
 
             // Key = artistKey + index so same-artist parallel tracks don't collide
             const aKey = `${artistKey(artist)}__${trackIndexCounter - 1}`
             activeTracks.set(aKey, { trackId, title, artist, aKey })
+            if (dupKey) seenTrackKeys.set(dupKey, trackId)
             // Also update single-var fallback (used by close() handler)
             currentTrackId = trackId
             currentTitle = title
@@ -2020,8 +2136,20 @@ ipcMain.handle('download:start', async (event, { id, url, format, bitrate, skipE
               || line.match(/^(.+?)\s*:\s*Skipped/i)
           if (skipMatch) {
             const fileStr = cleanText(skipMatch[1])
+            // De-dupe: don't add a skip card if this track already has a card.
+            // Only de-dupe skips when the string has a real title after
+            // "Artist - " — otherwise different no-title tracks by the same
+            // artist would collapse into one card and go missing.
+            const skipDashIdx = fileStr.indexOf(' - ')
+            const skipHasTitle = skipDashIdx > 0 && fileStr.substring(skipDashIdx + 3).trim().length > 0
+            const skipKey = skipHasTitle ? normKey(fileStr) : ''
+            if (skipKey && seenTrackKeys.has(skipKey)) {
+              console.log(`[spotdl dedupe skip] already have card for "${skipKey}"`)
+              continue
+            }
             const skippedTrackId = `${id}-track-skip-${trackIndexCounter++}`
             trackToParentMap.set(skippedTrackId, id)
+            if (skipKey) seenTrackKeys.set(skipKey, skippedTrackId)
             
             console.log(`[spotdl skipped] id=${skippedTrackId} file="${fileStr}"`)
 
@@ -2094,11 +2222,12 @@ ipcMain.handle('download:start', async (event, { id, url, format, bitrate, skipE
       })
 
       proc.stderr.on('data', (chunk) => {
-        const stderrChunk = decoder.write(chunk)
-        errStr += stderrChunk
+        const split = splitBufferLines(Buffer.concat([stderrBytes, chunk]))
+        stderrBytes = split.rest
+        const stderrLines = split.lines.map(decodeLine)
+        if (stderrLines.length) errStr += stderrLines.join('\n') + '\n'
 
         // Also parse stderr — some spotdl versions output progress here
-        const stderrLines = stderrChunk.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n')
         for (const rawLine of stderrLines) {
           const sLine = cleanText(rawLine)
           if (!sLine) continue
@@ -2123,7 +2252,7 @@ ipcMain.handle('download:start', async (event, { id, url, format, bitrate, skipE
       })
 
       proc.on('close', async (code) => {
-        stdoutBuffer += decoder.end() // Flush remaining buffer
+        stdoutBytes = Buffer.alloc(0) // discard any unterminated partial line
         activeDownloads.delete(id)
 
         if (downloadSession.cancelled) {

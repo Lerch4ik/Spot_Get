@@ -219,29 +219,6 @@ export function SettingsPanel() {
           </button>
         </div>
 
-        {/* Concurrent Downloads */}
-        <div>
-          <label className="text-xs text-muted-foreground mb-2 flex items-center gap-1.5">
-            <Gauge className="w-3 h-3" /> {lang === 'ru' ? 'Параллельных загрузок' : 'Concurrent Downloads'}
-          </label>
-          <div className="flex items-center gap-4">
-            <input
-              type="range"
-              min="1"
-              max="8"
-              value={localSettings.scanThreads}
-              onChange={(e) =>
-                setLocalSettings({ ...localSettings, scanThreads: parseInt(e.target.value) })
-              }
-              className="flex-1 h-2 rounded-full appearance-none bg-secondary cursor-pointer
-                [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:shadow-[0_0_10px_rgba(30,215,96,0.3)] [&::-webkit-slider-thumb]:cursor-pointer
-                [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer"
-            />
-            <span className="text-sm font-mono text-primary w-8 text-center">
-              {localSettings.scanThreads}
-            </span>
-          </div>
-        </div>
       </motion.div>
 
       {/* YouTube Cookies (bot-check bypass) */}
@@ -420,7 +397,7 @@ export function SettingsPanel() {
         <div className="space-y-2 text-xs text-muted-foreground">
           <div className="flex justify-between">
             <span>{lang === 'ru' ? 'Версия' : 'Version'}</span>
-            <span className="font-mono">{currentVersion || '2.8.0'}</span>
+            <span className="font-mono">{currentVersion || '2.8.2'}</span>
           </div>
           <div className="flex justify-between">
             <span>{lang === 'ru' ? 'Движок' : 'Engine'}</span>

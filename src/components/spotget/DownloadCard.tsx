@@ -300,8 +300,8 @@ export function DownloadCard({ download, subTracks = [], onCancel }: DownloadCar
           className="overflow-hidden"
         >
           <div className="ml-4 mr-2 mt-1 mb-2 space-y-1 max-h-[240px] overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
-            {subTracks
-              .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0))
+            {[...subTracks]
+              .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)) // newest first
               .map((track) => {
                 const trackColor = getPlatformColor(track.platform ?? "unknown")
                 const isTrackActive = track.status === "downloading"
