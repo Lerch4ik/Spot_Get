@@ -238,7 +238,7 @@ export function Sidebar() {
             <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
             <span>{lang === 'ru' ? 'Система активна' : 'System Online'}</span>
           </div>
-          <p className="text-[9px] text-muted-foreground/50 mt-1">v{currentVersion || '2.8.2'} • spotdl powered</p>
+          <p className="text-[9px] text-muted-foreground/50 mt-1">v{currentVersion || '2.8.4'} • spotdl powered</p>
         </div>
       </motion.aside>
     </>

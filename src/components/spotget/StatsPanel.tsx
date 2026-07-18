@@ -17,7 +17,6 @@ import {
 import { StatCard } from './StatCard'
 import { useSpotgetStore } from '@/lib/store'
 import { translations } from '@/lib/i18n'
-import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
 import {
   BarChart,
@@ -148,21 +147,45 @@ export function StatsPanel() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="relative max-w-5xl mx-auto space-y-6 pb-12">
+      {/* ── Ambient glow ────────────────────────────────── */}
+      <div
+        className="pointer-events-none absolute -top-20 left-1/2 -translate-x-1/2 w-[560px] h-[340px] rounded-full opacity-60"
+        style={{
+          background: "radial-gradient(ellipse at center, rgba(30,215,96,0.14) 0%, rgba(34,211,238,0.05) 45%, transparent 70%)",
+          filter: "blur(48px)",
+        }}
+      />
+
+      {/* ── Hero ────────────────────────────────────────── */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-start justify-between"
+        className="relative pt-8 text-center space-y-3"
       >
-        <div>
-          <h2 className="text-2xl font-bold">{t.statistics}</h2>
-          <p className="text-sm text-muted-foreground mt-1">{t.statistics} — {lang === 'ru' ? 'Обзор вашей активности' : 'Overview of your download activity'}</p>
+        <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight leading-tight">
+          <span
+            style={{
+              background: "linear-gradient(90deg, #1ed760 0%, #4ade80 50%, #22d3ee 100%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+            }}
+          >
+            {t.statistics}
+          </span>
+        </h1>
+        <p className="text-[13px] text-white/35">{lang === 'ru' ? 'Обзор твоей активности загрузок' : 'Overview of your download activity'}</p>
+        <div className="flex justify-center">
+          <button
+            type="button"
+            onClick={handleExportStats}
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[12px] font-medium text-white/55 hover:text-white transition-colors"
+            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)" }}
+          >
+            <ExportIcon className="w-3.5 h-3.5" />
+            {t.exportStats}
+          </button>
         </div>
-        <Button variant="outline" size="sm" onClick={handleExportStats}>
-          <ExportIcon className="w-3.5 h-3.5 mr-1.5" />
-          {t.exportStats}
-        </Button>
       </motion.div>
 
       {/* Overview Cards */}
@@ -199,7 +222,7 @@ export function StatsPanel() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="lg:col-span-2 rounded-2xl glass-card p-5"
+          className="lg:col-span-2 rounded-3xl border-[1.5px] border-white/10 bg-white/[0.03] backdrop-blur-xl p-5"
         >
           <h3 className="text-sm font-semibold mb-4">{lang === 'ru' ? 'Активность загрузок' : 'Download Activity'}</h3>
           <div className="h-64">
@@ -251,7 +274,7 @@ export function StatsPanel() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="rounded-2xl glass-card p-5"
+          className="rounded-3xl border-[1.5px] border-white/10 bg-white/[0.03] backdrop-blur-xl p-5"
         >
           <h3 className="text-sm font-semibold mb-4">{lang === 'ru' ? 'Распределение по формату' : 'Format Distribution'}</h3>
           <div className="h-48 relative">
@@ -309,7 +332,7 @@ export function StatsPanel() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
-          className="rounded-2xl glass-card p-5"
+          className="rounded-3xl border-[1.5px] border-white/10 bg-white/[0.03] backdrop-blur-xl p-5"
         >
           <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
             <TrendingUp className="w-4 h-4 text-primary" />
@@ -344,7 +367,7 @@ export function StatsPanel() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5 }}
-          className="rounded-2xl glass-card p-5"
+          className="rounded-3xl border-[1.5px] border-white/10 bg-white/[0.03] backdrop-blur-xl p-5"
         >
           <h3 className="text-sm font-semibold mb-4">{lang === 'ru' ? 'Загрузки по типу' : 'Downloads by Type'}</h3>
           <div className="h-48">

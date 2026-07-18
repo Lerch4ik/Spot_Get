@@ -18,25 +18,53 @@ process.env.PYTHONIOENCODING = "utf-8"
 
 // ── Portable data root ──────────────────────────────────────────────
 // Keep everything the app writes — binaries (spotdl/yt-dlp), ffmpeg + Deno,
-// cookies, logs and config — inside a single "data" folder next to the
-// executable. That way the uninstaller (which removes the install folder)
-// wipes every file the app created, leaving nothing behind. Falls back to
-// the OS userData dir when that folder isn't writable (e.g. a per-machine
-// install into Program Files) or while running in dev.
+// cookies, logs and config — in the standard per-user data folder
+// (%AppData%\Roaming\spot). Unlike the old "data" folder next to the exe,
+// this location is NOT touched by the installer, so history, settings and
+// cookies survive app updates.
+// One-time migration: older versions kept everything in <exeDir>\data, which
+// was wiped on every update. If that folder still exists, copy its contents
+// into userData once so nothing the user had is lost.
 let _TOOLS_HOME = null
-;(function initPortableData() {
+;(function initDataDir() {
   if (!app.isPackaged) { _TOOLS_HOME = os.homedir(); return }
   try {
-    const exeDir = path.dirname(app.getPath('exe'))
-    const dataDir = path.join(exeDir, 'data')
-    fs.mkdirSync(dataDir, { recursive: true })
-    const probe = path.join(dataDir, '.write-test')
-    fs.writeFileSync(probe, 'ok'); fs.unlinkSync(probe)
-    app.setPath('userData', dataDir)   // MUST run before electron-store is created
-    _TOOLS_HOME = dataDir
-    console.log('[portable] data dir:', dataDir)
+    const userDataDir = app.getPath('userData') // e.g. C:\Users\<user>\AppData\Roaming\spot
+    fs.mkdirSync(userDataDir, { recursive: true })
+
+    // ── one-time migration from the old portable folder ──
+    try {
+      const oldDir = path.join(path.dirname(app.getPath('exe')), 'data')
+      const marker = path.join(userDataDir, '.migrated-from-portable')
+      if (fs.existsSync(oldDir) && !fs.existsSync(marker)) {
+        const SKIP = new Set(['Cache', 'Code Cache', 'GPUCache', 'DawnCache', 'blob_storage', 'logs', 'fallback-tmp', '.write-test'])
+        for (const entry of fs.readdirSync(oldDir)) {
+          if (SKIP.has(entry)) continue
+          const src = path.join(oldDir, entry)
+          const dst = path.join(userDataDir, entry)
+          try {
+            if (entry === 'config.json' || entry === 'cookies.txt') {
+              // Always take the freshest copy — the portable folder is what
+              // the currently-installed version was writing to.
+              fs.copyFileSync(src, dst)
+            } else if (!fs.existsSync(dst)) {
+              fs.cpSync(src, dst, { recursive: true })
+            }
+          } catch (copyErr) {
+            console.error('[data] migration copy failed for', entry, copyErr.message)
+          }
+        }
+        fs.writeFileSync(marker, 'ok')
+        console.log('[data] migrated portable data from', oldDir)
+      }
+    } catch (migErr) {
+      console.error('[data] migration failed:', migErr.message)
+    }
+
+    _TOOLS_HOME = userDataDir
+    console.log('[data] userData dir:', userDataDir)
   } catch (e) {
-    console.error('[portable] not writable next to exe, using default userData:', e.message)
+    console.error('[data] init failed, using home dir:', e.message)
     _TOOLS_HOME = os.homedir()
   }
 })()
@@ -1293,8 +1321,8 @@ function resolveDownloadParentId(id) {
 }
 
 // ── IPC: Download logic ──
-ipcMain.handle('download:start', async (event, { id, url, format, bitrate, concurrency }) => {
-  console.log(`[download:start] ID=${id} URL=${url} format=${format} bitrate=${bitrate}`)
+ipcMain.handle('download:start', async (event, { id, url, format, bitrate, concurrency, folderName }) => {
+  console.log(`[download:start] ID=${id} URL=${url} format=${format} bitrate=${bitrate} folder="${folderName || ''}"`)
   
   const spotdlBin = findSpotdl()
   const ytdlpBin = findYtdlp()
@@ -1306,7 +1334,12 @@ ipcMain.handle('download:start', async (event, { id, url, format, bitrate, concu
 
   const platform = detectUrlPlatform(url)
   const settings = store.get('settings') || {}
-  const outDir = settings.outputDirectory || path.join(os.homedir(), 'Music', 'Spotget')
+  const baseDir = settings.outputDirectory || path.join(os.homedir(), 'Music', 'Spotget')
+  // Per-download subfolder: the user types a name on the Download page and the
+  // music is saved to <base folder>\<folder name>. Characters Windows does not
+  // allow in folder names are stripped out.
+  const cleanFolder = String(folderName || '').replace(/[<>:"/\\|?*]/g, '').replace(/\s+/g, ' ').trim().slice(0, 80)
+  const outDir = cleanFolder ? path.join(baseDir, cleanFolder) : baseDir
 
   if (!fs.existsSync(outDir)) {
     fs.mkdirSync(outDir, { recursive: true })
@@ -2564,7 +2597,7 @@ ipcMain.handle('update:download', async (event) => {
     // ВАЖНО: НЕ качаем установщик в userData/updates! В portable-режиме
     // userData находится ВНУТРИ папки установки (...\Spot\data), и установщик,
     // запущенный оттуда, блокирует папку, которую сам должен перезаписать и
-    // очистить — NSIS решает, что «Spot всё ещё открыт», и показывает диалог
+    // очист��ть — NSIS решает, что «Spot всё ещё открыт», и показывает диалог
     // «Не удалось закрыть Spot». Качаем в системную temp-папку: она никак
     // не связана с папкой установки.
     const updatesDir = path.join(os.tmpdir(), 'spot-updates')

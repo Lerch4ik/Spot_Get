@@ -7,7 +7,6 @@ import { useSpotgetStore, type DownloadStatus, type SpotifyType, type Platform, 
 import { translations } from '@/lib/i18n'
 import { HistoryItem } from './HistoryItem'
 import { TypeChipSelect, PlatformChipSelect } from './ChipSelect'
-import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
 
 export function HistoryPanel() {
@@ -86,28 +85,56 @@ export function HistoryPanel() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="relative max-w-3xl mx-auto space-y-6 pb-12">
+      {/* ── Ambient glow ────────────────────────────────────── */}
+      <div
+        className="pointer-events-none absolute -top-20 left-1/2 -translate-x-1/2 w-[560px] h-[340px] rounded-full opacity-60"
+        style={{
+          background: "radial-gradient(ellipse at center, rgba(30,215,96,0.14) 0%, rgba(34,211,238,0.05) 45%, transparent 70%)",
+          filter: "blur(48px)",
+        }}
+      />
+
+      {/* ── Hero ────────────────────────────────────────────── */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-start justify-between"
+        className="relative pt-8 text-center space-y-3"
       >
-        <div>
-          <h2 className="text-2xl font-bold">{t.downloadHistory}</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            {filteredDownloads.length} {lang === 'ru' ? 'из' : 'of'} {downloads.length} {lang === 'ru' ? 'записей' : 'items'}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleExportHistory}>
-            <ExportIcon className="w-3.5 h-3.5 mr-1.5" />
+        <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight leading-tight">
+          <span className="text-white">{lang === 'ru' ? 'История ' : 'Download '}</span>
+          <span
+            style={{
+              background: "linear-gradient(90deg, #1ed760 0%, #4ade80 50%, #22d3ee 100%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+            }}
+          >
+            {lang === 'ru' ? 'загрузок' : 'history'}
+          </span>
+        </h1>
+        <p className="text-[13px] text-white/35">
+          {filteredDownloads.length} {lang === 'ru' ? 'из' : 'of'} {downloads.length} {lang === 'ru' ? 'записей' : 'items'}
+        </p>
+        <div className="flex items-center justify-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={handleExportHistory}
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[12px] font-medium text-white/55 hover:text-white transition-colors"
+            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)" }}
+          >
+            <ExportIcon className="w-3.5 h-3.5" />
             {t.exportHistory}
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleImportHistory}>
-            <ImportIcon className="w-3.5 h-3.5 mr-1.5" />
+          </button>
+          <button
+            type="button"
+            onClick={handleImportHistory}
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[12px] font-medium text-white/55 hover:text-white transition-colors"
+            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)" }}
+          >
+            <ImportIcon className="w-3.5 h-3.5" />
             {t.importHistory}
-          </Button>
+          </button>
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
@@ -116,7 +143,8 @@ export function HistoryPanel() {
                 clearHistory()
               }
             }}
-            className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium bg-destructive/10 text-destructive border border-destructive/20 hover:bg-destructive/20 transition-colors"
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[12px] font-medium transition-colors"
+            style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.22)", color: "rgba(239,68,68,0.85)" }}
           >
             <Trash2 className="w-3.5 h-3.5" />
             {t.clearHistory}
@@ -124,22 +152,22 @@ export function HistoryPanel() {
         </div>
       </motion.div>
 
-      {/* Search & Filters */}
+      {/* ── Search & Filters ────────────────────────────────── */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="rounded-2xl glass-card p-5 space-y-4"
+        className="relative space-y-4"
       >
-        {/* Search */}
+        {/* Search pill */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/25" />
           <input
             type="text"
             value={localSearch}
             onChange={(e) => setLocalSearch(e.target.value)}
             placeholder={lang === 'ru' ? 'Поиск по названию или исполнителю...' : 'Search by title or artist...'}
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-secondary border border-border text-sm focus:outline-none focus:border-primary focus:shadow-[0_0_0_2px_rgba(30,215,96,0.2)] transition-all placeholder:text-muted-foreground/50"
+            className="w-full pl-11 pr-5 py-3 rounded-full text-sm text-white placeholder:text-white/20 outline-none transition-all backdrop-blur-xl border-[1.5px] border-white/10 bg-white/[0.045] focus:border-primary/40 focus:shadow-[0_0_28px_rgba(30,215,96,0.14)]"
           />
         </div>
 

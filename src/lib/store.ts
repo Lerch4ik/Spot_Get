@@ -400,6 +400,25 @@ interface SpotgetState {
   clearDownloadSessionIds: () => void // Функция для очистки сессии
 }
 
+// Persist volume/mute in localStorage so the player never blasts at full
+// volume after a restart.
+function loadSavedVolume(): { volume: number; isMuted: boolean } {
+  try {
+    if (typeof window !== "undefined") {
+      const v = JSON.parse(localStorage.getItem("spot-volume") || "null")
+      if (v && typeof v.volume === "number" && isFinite(v.volume)) {
+        return { volume: Math.max(0, Math.min(1, v.volume)), isMuted: !!v.isMuted }
+      }
+    }
+  } catch {}
+  return { volume: 0.75, isMuted: false }
+}
+const savedVolume = loadSavedVolume()
+
+function persistVolume(volume: number, isMuted: boolean) {
+  try { localStorage.setItem("spot-volume", JSON.stringify({ volume, isMuted })) } catch {}
+}
+
 export const useSpotgetStore = create<SpotgetState>((set, get) => ({
   lang: "en",
   setLang: (lang) => {
@@ -648,8 +667,8 @@ export const useSpotgetStore = create<SpotgetState>((set, get) => ({
   queueIndex: 0,
   isPlaying: false,
   currentTime: 0,
-  volume: 0.75,
-  isMuted: false,
+  volume: savedVolume.volume,
+  isMuted: savedVolume.isMuted,
   repeatMode: "off",
   isShuffled: false,
   playerView: "mini",
@@ -722,8 +741,16 @@ export const useSpotgetStore = create<SpotgetState>((set, get) => ({
     }))
   },
 
-  setVolume: (vol) => set({ volume: Math.max(0, Math.min(1, vol)), isMuted: false }),
-  toggleMute: () => set((s) => ({ isMuted: !s.isMuted })),
+  setVolume: (vol) => {
+    const v = Math.max(0, Math.min(1, vol))
+    persistVolume(v, false)
+    set({ volume: v, isMuted: false })
+  },
+  toggleMute: () =>
+    set((s) => {
+      persistVolume(s.volume, !s.isMuted)
+      return { isMuted: !s.isMuted }
+    }),
   toggleRepeat: () =>
     set((s) => {
       const modes: RepeatMode[] = ["off", "all", "one"]

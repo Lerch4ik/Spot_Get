@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, CSSProperties } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Download, CheckCircle2, XCircle, HardDrive, Clipboard,
-  Music2, ArrowDown, Loader2, Zap, TrendingUp, Square, Trash2
+  Music2, ArrowDown, Loader2, Zap, TrendingUp, Square, Trash2, FolderOpen
 } from "lucide-react"
 import {
   useSpotgetStore,
@@ -18,7 +18,6 @@ import { FormatChipSelect, BitrateChipSelect } from "./ChipSelect"
 import { initIpcBridge } from "@/lib/ipc-bridge"
 import { GlowButton } from "./GlowButton"
 import { DownloadCard } from "./DownloadCard"
-import { StatCard } from "./StatCard"
 
 // ── Platform icons ──────────────────────────────────────────────
 function SpotifyIcon({ className, style }: { className?: string; style?: CSSProperties }) {
@@ -127,6 +126,25 @@ export function DownloadPanel() {
   const [preparing, setPreparing] = useState(false)
   const [platform, setPlatform]   = useState<Platform>("unknown")
   const [pasted, setPasted]       = useState(false)
+  const [folderName, setFolderName] = useState("")
+  const [recentFolders, setRecentFolders] = useState<string[]>([])
+
+  // Recently used folder names — shown as quick chips under the folder input.
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("spot-recent-folders") || "[]")
+      if (Array.isArray(saved)) setRecentFolders(saved.filter((f) => typeof f === "string").slice(0, 6))
+    } catch {}
+  }, [])
+
+  const rememberFolder = (name: string) => {
+    if (!name) return
+    setRecentFolders((prev) => {
+      const next = [name, ...prev.filter((f) => f !== name)].slice(0, 6)
+      try { localStorage.setItem("spot-recent-folders", JSON.stringify(next)) } catch {}
+      return next
+    })
+  }
 
   const t = translations[lang]
 
@@ -161,6 +179,16 @@ export function DownloadPanel() {
 
   const handleStart = async () => {
     if (!url) return
+
+    // First download and no base folder chosen yet — ask the user to pick one.
+    const bridge = (window as any).electronAPI
+    if (!useSpotgetStore.getState().settings.outputDirectory && bridge?.openFolder) {
+      const selected = await bridge.openFolder()
+      if (selected) {
+        useSpotgetStore.getState().updateSettings({ outputDirectory: selected })
+      }
+    }
+
     setPreparing(true)
 
     const parentId = `dl-${Date.now()}`
@@ -195,9 +223,11 @@ export function DownloadPanel() {
     }
 
     try {
-      const result = await api.startDownload({ id: parentId, url, format, bitrate, concurrency: 4 })
+      rememberFolder(folderName.trim())
+      const result = await api.startDownload({ id: parentId, url, format, bitrate, concurrency: 4, folderName: folderName.trim() })
       setPreparing(false)
       setUrl("")
+      setFolderName("")
       setPlatform("unknown")
 
       if (result.success) {
@@ -287,118 +317,122 @@ export function DownloadPanel() {
     return true
   })
 
+  const ru = lang === 'ru'
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-4 pb-10 items-start">
+    <div className="relative max-w-3xl mx-auto space-y-6 pb-12">
 
-      {/* ── Main column ──────────────────────────────────────────── */}
-      <div className="space-y-4 min-w-0">
-
-      {/* ── URL Input card ─────────────────────────────────────── */}
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, ease: "easeOut" }}
-        className="rounded-2xl border border-white/[0.07] overflow-hidden backdrop-blur-xl"
+      {/* ── Ambient glow ────────────────────────────────────── */}
+      <div
+        className="pointer-events-none absolute -top-20 left-1/2 -translate-x-1/2 w-[560px] h-[340px] rounded-full opacity-60"
         style={{
-          background: "linear-gradient(135deg, rgba(255,255,255,0.035) 0%, rgba(255,255,255,0.02) 100%)",
-          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.06), 0 8px 32px rgba(0,0,0,0.35)",
+          background: "radial-gradient(ellipse at center, rgba(30,215,96,0.18) 0%, rgba(34,211,238,0.06) 45%, transparent 70%)",
+          filter: "blur(48px)",
         }}
+      />
+
+      {/* ── Hero ────────────────────────────────────────────── */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: "easeOut" }}
+        className="relative pt-8 text-center space-y-3"
       >
-        {/* Header strip */}
-        <div className="flex items-center justify-between px-5 pt-4 pb-3">
-          <div className="flex items-center gap-2.5">
-            <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center"
-              style={{ background: "rgba(30,215,96,0.12)", border: "1px solid rgba(30,215,96,0.2)" }}
-            >
-              <Download className="w-4 h-4 text-primary" />
-            </div>
-            <div>
-              <h2 className="text-[13px] font-bold text-white leading-tight">{t.downloadMusic}</h2>
-              <p className="text-[10px] text-white/30 leading-none mt-0.5">{t.pasteUrlHelp}</p>
-            </div>
-          </div>
+        <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight leading-tight">
+          <span className="text-white">{ru ? 'Скачай ' : 'Download '}</span>
+          <span
+            style={{
+              background: "linear-gradient(90deg, #1ed760 0%, #4ade80 50%, #22d3ee 100%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+            }}
+          >
+            {ru ? 'любую музыку' : 'any music'}
+          </span>
+        </h1>
+        <p className="text-[13px] text-white/35 max-w-md mx-auto leading-relaxed">
+          {ru
+            ? 'Вставь ссылку на трек, альбом или плейлист — Spotify, YouTube, SoundCloud или Яндекс Музыка'
+            : 'Paste a track, album or playlist link — Spotify, YouTube, SoundCloud or Yandex Music'}
+        </p>
+      </motion.div>
 
-          {/* Session progress badge */}
-          {isDownloadSessionActive && totalTracksCount && (
-            <div className="flex items-center gap-2">
-              <ProgressRing progress={sessionProgress} color="#1ed760" />
-              <div className="text-right">
-                <p className="text-[11px] font-bold text-primary leading-tight">
-                  {shownCompleted ?? 0} / {totalTracksCount}
-                </p>
-                <p className="text-[10px] text-white/30 leading-none">{lang === 'ru' ? 'треков' : 'tracks'}</p>
-                {sessionFailedCount > 0 && (
-                  <p className="text-[10px] font-semibold text-destructive leading-none mt-0.5">
-                    {sessionFailedCount} {lang === 'ru' ? 'ошибок' : 'failed'}
-                  </p>
-                )}
-              </div>
-            </div>
+      {/* ── Big search-style input ──────────────────────────── */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: "easeOut", delay: 0.08 }}
+        className="relative space-y-3"
+      >
+        <div
+          className="flex items-center gap-2 rounded-full pl-5 pr-2 py-2 backdrop-blur-xl transition-all"
+          style={{
+            background: "rgba(255,255,255,0.045)",
+            border: url && platform !== "unknown"
+              ? `1.5px solid ${platformColor}55`
+              : "1.5px solid rgba(255,255,255,0.09)",
+            boxShadow: url && platform !== "unknown"
+              ? `0 0 36px ${platformColor}22, inset 0 1px 0 rgba(255,255,255,0.06)`
+              : "0 8px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06)",
+          }}
+        >
+          {platform !== "unknown" && url ? (
+            <PlatformIcon platform={platform} className="w-5 h-5 flex-shrink-0" style={{ color: platformColor }} />
+          ) : (
+            <Music2 className="w-5 h-5 text-white/20 flex-shrink-0" />
           )}
-        </div>
-
-        {/* URL input area */}
-        <div className="px-5 pb-4 space-y-3">
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <div className="absolute left-3.5 top-1/2 -translate-y-1/2">
-                {platform !== "unknown" && url ? (
-                  <PlatformIcon platform={platform} className="w-4 h-4" style={{ color: platformColor }} />
-                ) : (
-                  <Music2 className="w-4 h-4 text-white/20" />
-                )}
-              </div>
-              <input
-                type="text"
-                placeholder={t.placeholderUrl}
-                value={url}
-                onChange={(e) => handleUrlChange(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && !preparing && url && handleStart()}
-                disabled={preparing}
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl text-sm text-white placeholder:text-white/20 transition-all outline-none"
-                style={{
-                  background: "rgba(255,255,255,0.04)",
-                  border: url && platform !== "unknown"
-                    ? `1px solid ${platformColor}40`
-                    : "1px solid rgba(255,255,255,0.08)",
-                  boxShadow: url && platform !== "unknown"
-                    ? `0 0 0 3px ${platformColor}10`
-                    : "none",
-                }}
-              />
-            </div>
-
-            {/* Paste */}
-            <button
+          <input
+            type="text"
+            placeholder={t.placeholderUrl}
+            value={url}
+            onChange={(e) => handleUrlChange(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && !preparing && url && handleStart()}
+            disabled={preparing}
+            className="flex-1 min-w-0 bg-transparent py-2 text-sm text-white placeholder:text-white/20 outline-none"
+          />
+          <button
+            type="button"
+            onClick={handlePaste}
+            title={ru ? 'Вставить из буфера' : 'Paste from clipboard'}
+            className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-white/40 hover:text-white hover:bg-white/[0.07] transition-colors"
+          >
+            <AnimatePresence mode="wait">
+              {pasted ? (
+                <motion.span key="check" initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
+                  <CheckCircle2 className="w-4 h-4 text-primary" />
+                </motion.span>
+              ) : (
+                <motion.span key="clip" initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
+                  <Clipboard className="w-4 h-4" />
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </button>
+          {isDownloadSessionActive ? (
+            <motion.button
+              initial={{ opacity: 0, scale: 0.85 }}
+              animate={{ opacity: 1, scale: 1 }}
+              whileHover={{ scale: 1.04 }}
+              whileTap={{ scale: 0.93 }}
+              onClick={handleStopAll}
               type="button"
-              onClick={handlePaste}
-              title={lang === 'ru' ? 'Вставить из буфера' : 'Paste from clipboard'}
-              className="w-10 rounded-xl border border-white/[0.08] bg-white/[0.04] hover:bg-white/[0.08] flex items-center justify-center text-white/40 hover:text-white transition-colors"
+              title={ru ? 'Остановить все загрузки' : 'Stop all downloads'}
+              className="h-10 px-5 rounded-full flex items-center gap-2 flex-shrink-0 text-[13px] font-semibold transition-colors"
+              style={{ background: "rgba(239,68,68,0.14)", border: "1px solid rgba(239,68,68,0.35)", color: "rgba(239,68,68,0.95)" }}
             >
-              <AnimatePresence mode="wait">
-                {pasted ? (
-                  <motion.span key="check" initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
-                    <CheckCircle2 className="w-4 h-4 text-primary" />
-                  </motion.span>
-                ) : (
-                  <motion.span key="clip" initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
-                    <Clipboard className="w-4 h-4" />
-                  </motion.span>
-                )}
-              </AnimatePresence>
-            </button>
-
-            {/* Download */}
+              <Square className="w-3.5 h-3.5" fill="currentColor" />
+              {ru ? 'Стоп' : 'Stop'}
+            </motion.button>
+          ) : (
             <GlowButton
               onClick={handleStart}
-              disabled={preparing || !url || isDownloadSessionActive}
-              className="px-5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 min-w-[120px] justify-center"
+              disabled={preparing || !url}
+              className="px-6 py-2.5 rounded-full text-sm font-semibold flex items-center gap-2 min-w-[130px] justify-center flex-shrink-0"
             >
               {preparing ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  {lang === 'ru' ? 'Подготовка…' : 'Preparing…'}
+                  {ru ? 'Подготовка…' : 'Preparing…'}
                 </>
               ) : (
                 <>
@@ -407,112 +441,144 @@ export function DownloadPanel() {
                 </>
               )}
             </GlowButton>
+          )}
+        </div>
 
-            {/* Stop all button — visible only during active session */}
-            {isDownloadSessionActive && (
-              <motion.button
-                initial={{ opacity: 0, scale: 0.85 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.85 }}
-                whileHover={{ scale: 1.04 }}
-                whileTap={{ scale: 0.93 }}
-                onClick={handleStopAll}
+        {/* Folder pill */}
+        <div
+          className="flex items-center gap-2 rounded-full pl-5 pr-4 py-1 backdrop-blur-xl"
+          style={{
+            background: "rgba(255,255,255,0.03)",
+            border: folderName.trim() ? "1.5px solid rgba(34,197,94,0.35)" : "1.5px solid rgba(255,255,255,0.07)",
+          }}
+        >
+          <FolderOpen className="w-4 h-4 flex-shrink-0" style={{ color: folderName.trim() ? "#22c55e" : "rgba(255,255,255,0.2)" }} />
+          <input
+            type="text"
+            placeholder={ru ? 'Название папки (необязательно) — например, название плейлиста' : 'Folder name (optional) — e.g. playlist name'}
+            value={folderName}
+            onChange={(e) => setFolderName(e.target.value.replace(/[<>:"/\\|?*]/g, ""))}
+            onKeyDown={(e) => e.key === "Enter" && !preparing && url && handleStart()}
+            disabled={preparing}
+            className="flex-1 min-w-0 bg-transparent py-2 text-[13px] text-white placeholder:text-white/20 outline-none"
+          />
+        </div>
+
+        {/* Recent folders */}
+        {recentFolders.length > 0 && (
+          <div className="flex items-center justify-center gap-1.5 flex-wrap">
+            {recentFolders.map((name) => (
+              <button
+                key={name}
                 type="button"
-                title={lang === 'ru' ? 'Остановить все загрузки' : 'Stop all downloads'}
-                className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors"
+                onClick={() => setFolderName(folderName === name ? "" : name)}
+                className="px-3 py-1 rounded-full text-[11px] transition-colors"
                 style={{
-                  background: "rgba(239,68,68,0.12)",
-                  border: "1px solid rgba(239,68,68,0.3)",
-                  color: "rgba(239,68,68,0.9)",
+                  background: folderName === name ? "rgba(30,215,96,0.12)" : "rgba(255,255,255,0.04)",
+                  border: folderName === name ? "1px solid rgba(30,215,96,0.3)" : "1px solid rgba(255,255,255,0.08)",
+                  color: folderName === name ? "#1ed760" : "rgba(255,255,255,0.45)",
                 }}
               >
-                <Square className="w-4 h-4" fill="currentColor" />
-              </motion.button>
-            )}
+                {name}
+              </button>
+            ))}
           </div>
+        )}
+        <p className="text-center text-[10px] text-white/25 leading-none">
+          {(ru ? 'Сохранится в: ' : 'Saves to: ') +
+            (settings.outputDirectory || (ru ? 'Музыка\\Spotget (спросим при первой скачке)' : 'Music\\Spotget (asked on first download)')) +
+            (folderName.trim() ? `\\${folderName.trim()}` : '')}
+        </p>
 
-          {/* Format & Bitrate */}
-          <div
-            className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3 pt-3"
-            style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
-          >
-            <FormatChipSelect
-              value={format}
-              onChange={setFormat}
-              options={["mp3", "flac", "ogg", "wav"]}
-              label={lang === 'ru' ? 'Формат' : 'Format'}
-            />
-            <BitrateChipSelect
-              value={bitrate}
-              onChange={setBitrate}
-              options={["128k", "192k", "256k", "320k"]}
-              label={lang === 'ru' ? 'Битрейт' : 'Bitrate'}
-            />
-          </div>
+        {/* Format & bitrate */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 max-w-xl mx-auto pt-1">
+          <FormatChipSelect
+            value={format}
+            onChange={setFormat}
+            options={["mp3", "flac", "ogg", "wav"]}
+            label={ru ? 'Формат' : 'Format'}
+          />
+          <BitrateChipSelect
+            value={bitrate}
+            onChange={setBitrate}
+            options={["128k", "192k", "256k", "320k"]}
+            label={ru ? 'Битрейт' : 'Bitrate'}
+          />
         </div>
       </motion.div>
 
-      {/* ── Active downloads list ─────────────────────────────── */}
-      <motion.div
+      {/* ── Session progress ───────────────────────────────── */}
+      <AnimatePresence>
+        {isDownloadSessionActive && totalTracksCount ? (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className="rounded-2xl px-5 py-4 backdrop-blur-xl flex items-center gap-4"
+            style={{
+              background: "linear-gradient(135deg, rgba(30,215,96,0.07), rgba(255,255,255,0.02))",
+              border: "1px solid rgba(30,215,96,0.2)",
+            }}
+          >
+            <ProgressRing progress={sessionProgress} color="#1ed760" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[13px] font-bold text-white/85 leading-tight">
+                {ru ? 'Скачивается…' : 'Downloading…'}
+                <span className="text-primary ml-2">{shownCompleted ?? 0} / {totalTracksCount}</span>
+                {sessionFailedCount > 0 && (
+                  <span className="text-destructive ml-2">{sessionFailedCount} {ru ? 'ошибок' : 'failed'}</span>
+                )}
+              </p>
+              <div className="mt-2 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.07)" }}>
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{ width: `${sessionProgress}%`, background: "linear-gradient(90deg, #1ed760, #4ade80)" }}
+                />
+              </div>
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+
+      {/* ── Downloads ──────────────────────────────────────── */}
+      <motion.section
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, ease: "easeOut", delay: 0.07 }}
-        className="rounded-2xl overflow-hidden backdrop-blur-xl"
-        style={{
-          background: "rgba(255,255,255,0.022)",
-          border: "1px solid rgba(255,255,255,0.07)",
-          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.05), 0 8px 32px rgba(0,0,0,0.3)",
-        }}
+        transition={{ duration: 0.35, ease: "easeOut", delay: 0.14 }}
+        className="relative"
       >
-        {/* Header */}
-        <div
-          className="flex items-center justify-between px-4 py-3"
-          style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}
-        >
-          <div className="flex items-center gap-2.5">
-            <div
-              className="w-7 h-7 rounded-lg flex items-center justify-center"
-              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.07)" }}
-            >
-              <Zap className="w-3.5 h-3.5 text-white/50" />
-            </div>
-            <div>
-              <span className="text-[13px] font-bold text-white/80 leading-tight block">
-                {t.downloadedFiles || "Загруженные файлы"}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Zap className="w-4 h-4 text-primary/70" />
+            <h2 className="text-[15px] font-bold text-white/85 leading-none">
+              {t.downloadedFiles || (ru ? 'Загруженные файлы' : 'Downloaded files')}
+            </h2>
+            {visibleDownloads.length > 0 && (
+              <span
+                className="px-2 py-0.5 rounded-full text-[10px] font-bold"
+                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.4)" }}
+              >
+                {visibleDownloads.length}
               </span>
-              {visibleDownloads.length > 0 && (
-                <span className="text-[10px] text-white/25 leading-none">
-                  {visibleDownloads.length} {t.tracks || "треков"}
-                </span>
-              )}
-            </div>
+            )}
           </div>
-
           <div className="flex items-center gap-2">
             {activeCount > 0 && (
               <div
                 className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold"
-                style={{
-                  background: "rgba(30,215,96,0.1)",
-                  border: "1px solid rgba(30,215,96,0.22)",
-                  color: "#1ed760",
-                }}
+                style={{ background: "rgba(30,215,96,0.1)", border: "1px solid rgba(30,215,96,0.22)", color: "#1ed760" }}
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-[#1ed760] animate-pulse" />
-                {activeCount} {lang === 'ru' ? 'активных' : 'active'}
+                {activeCount} {ru ? 'активных' : 'active'}
               </div>
             )}
             {completedDownloads.length > 0 && activeCount === 0 && (
               <div
                 className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium"
-                style={{
-                  background: "rgba(255,255,255,0.04)",
-                  border: "1px solid rgba(255,255,255,0.08)",
-                  color: "rgba(255,255,255,0.4)",
-                }}
+                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.4)" }}
               >
                 <CheckCircle2 className="w-3 h-3" />
-                {completedDownloads.length} {lang === 'ru' ? 'завершено' : 'completed'}
+                {completedDownloads.length} {ru ? 'завершено' : 'completed'}
               </div>
             )}
             {downloads.length > 0 && (
@@ -521,62 +587,51 @@ export function DownloadPanel() {
                 whileTap={{ scale: 0.95 }}
                 type="button"
                 onClick={() => {
-                  if (confirm(lang === 'ru'
+                  if (confirm(ru
                     ? 'Очистить всё? Это удалит все загрузки, историю, плейлисты и избранное.'
                     : 'Clear everything? This removes all downloads, history, playlists and liked songs.')) {
                     clearAllData()
                   }
                 }}
-                title={lang === 'ru' ? 'Очистить всё' : 'Clear all'}
+                title={ru ? 'Очистить всё' : 'Clear all'}
                 className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors"
-                style={{
-                  background: "rgba(239,68,68,0.08)",
-                  border: "1px solid rgba(239,68,68,0.22)",
-                  color: "rgba(239,68,68,0.85)",
-                }}
+                style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.22)", color: "rgba(239,68,68,0.85)" }}
               >
                 <Trash2 className="w-3 h-3" />
-                {lang === 'ru' ? 'Очистить всё' : 'Clear all'}
+                {ru ? 'Очистить всё' : 'Clear all'}
               </motion.button>
             )}
           </div>
         </div>
 
-        {/* List */}
-        <div className="p-2 space-y-1.5 max-h-[480px] overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+        <div className="space-y-1.5 max-h-[520px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
           <AnimatePresence initial={false}>
             {visibleDownloads.length === 0 ? (
               <motion.div
                 key="empty"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="flex flex-col items-center justify-center py-14 text-center gap-4"
+                className="flex flex-col items-center justify-center py-16 text-center gap-4 rounded-2xl"
+                style={{ border: "1px dashed rgba(255,255,255,0.08)" }}
               >
                 <div
-                  className="w-16 h-16 rounded-2xl flex items-center justify-center"
-                  style={{
-                    background: "linear-gradient(135deg, rgba(30,215,96,0.06), rgba(30,215,96,0.02))",
-                    border: "1px solid rgba(30,215,96,0.12)",
-                  }}
+                  className="w-16 h-16 rounded-full flex items-center justify-center"
+                  style={{ background: "linear-gradient(135deg, rgba(30,215,96,0.08), rgba(34,211,238,0.04))", border: "1px solid rgba(30,215,96,0.14)" }}
                 >
                   <Music2 className="w-7 h-7 text-primary/40" />
                 </div>
                 <div>
-                  <p className="text-[13px] font-semibold text-white/25">{t.noDownloadsYet || "Нет загрузок"}</p>
-                  <p className="text-[11px] text-white/15 mt-1.5 leading-relaxed max-w-[200px] mx-auto">
-                    {t.pasteUrlHelp}
-                  </p>
+                  <p className="text-[13px] font-semibold text-white/30">{t.noDownloadsYet || (ru ? 'Нет загрузок' : 'No downloads yet')}</p>
+                  <p className="text-[11px] text-white/15 mt-1.5 leading-relaxed max-w-[220px] mx-auto">{t.pasteUrlHelp}</p>
                 </div>
               </motion.div>
             ) : (
               [...visibleDownloads]
                 .sort((a, b) => {
-                  // Active (downloading/pending) items first
                   const aActive = a.status === "downloading" || a.status === "pending"
                   const bActive = b.status === "downloading" || b.status === "pending"
                   if (aActive && !bActive) return -1
                   if (!aActive && bActive) return 1
-                  // Within same status group: newest first
                   return (b.createdAt || 0) - (a.createdAt || 0)
                 })
                 .map((item) => (
@@ -590,175 +645,45 @@ export function DownloadPanel() {
             )}
           </AnimatePresence>
         </div>
-      </motion.div>
+      </motion.section>
 
-      {/* ── Stats row ─────────────────────────────────────────── */}
+      {/* ── Stats ──────────────────────────────────────────── */}
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, ease: "easeOut", delay: 0.14 }}
-        className="grid grid-cols-2 [grid-template-columns:repeat(auto-fit,minmax(140px,1fr))] gap-3"
+        transition={{ duration: 0.35, ease: "easeOut", delay: 0.2 }}
+        className="space-y-3"
       >
-        <StatCard title={lang === 'ru' ? 'Всего' : 'Total'}      value={footerStats.totalDownloads}     icon={<Download     className="w-4 h-4" />} />
-        <StatCard title={lang === 'ru' ? 'Завершено' : 'Done'}  value={footerStats.completedDownloads} icon={<CheckCircle2 className="w-4 h-4" />} />
-        <StatCard title={lang === 'ru' ? 'Ошибки' : 'Errors'}   value={footerStats.failedDownloads}    icon={<XCircle      className="w-4 h-4" />} />
-        <StatCard title={lang === 'ru' ? 'Хранилище' : 'Storage'}  value={footerStats.storageUsed || '—'}  icon={<HardDrive    className="w-4 h-4" />} />
-      </motion.div>
-      </div>{/* end main column */}
-
-      {/* ── Right rail ───────────────────────────────────────────── */}
-      <DownloadSideRail
-        lang={lang}
-        stats={footerStats}
-        successRate={footerStats.successRate}
-        activeCount={activeCount}
-      />
-    </div>
-  )
-}
-
-// ── Right rail: fills the fullscreen width with useful, live content ──
-function DownloadSideRail({
-  lang, stats, successRate, activeCount,
-}: {
-  lang: string
-  stats: { completedDownloads: number; failedDownloads: number; totalDownloads: number; storageUsed: string }
-  successRate: number
-  activeCount: number
-}) {
-  const ru = lang === 'ru'
-  const platforms: { name: string; color: string; Icon: any }[] = [
-    { name: 'Spotify',    color: '#1ed760', Icon: SpotifyIcon },
-    { name: 'YouTube',    color: '#ff0000', Icon: YouTubeIcon },
-    { name: 'SoundCloud', color: '#ff5500', Icon: SoundCloudIcon },
-    { name: 'Yandex',     color: '#ffcc00', Icon: YandexIcon },
-  ]
-  const quality: { fmt: string; desc: string; tag: string }[] = [
-    { fmt: 'FLAC', desc: ru ? 'Без потерь, максимум качества' : 'Lossless, maximum quality', tag: ru ? 'Лучшее' : 'Best' },
-    { fmt: 'WAV',  desc: ru ? 'Несжатый, большой размер'     : 'Uncompressed, large files',  tag: ru ? 'Студия' : 'Studio' },
-    { fmt: 'MP3',  desc: ru ? '320 kbps, универсальный'       : '320 kbps, universal',         tag: ru ? 'Обычный' : 'Common' },
-    { fmt: 'OGG',  desc: ru ? 'Компактный, открытый формат'   : 'Compact, open format',        tag: 'Vorbis' },
-  ]
-
-  const card = "rounded-2xl border border-white/[0.07] backdrop-blur-xl overflow-hidden"
-  const cardStyle: CSSProperties = {
-    background: "linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.018) 100%)",
-    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.05), 0 8px 32px rgba(0,0,0,0.3)",
-  }
-
-  return (
-    <div className="space-y-4 lg:sticky lg:top-2">
-      {/* Session summary with radial gauge */}
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, ease: "easeOut", delay: 0.05 }}
-        className={card}
-        style={cardStyle}
-      >
-        <div className="px-5 pt-4 pb-3 flex items-center gap-2.5" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(30,215,96,0.12)", border: "1px solid rgba(30,215,96,0.2)" }}>
-            <TrendingUp className="w-4 h-4 text-primary" />
-          </div>
-          <div>
-            <h3 className="text-[13px] font-bold text-white leading-tight">{ru ? 'Сводка' : 'Overview'}</h3>
-            <p className="text-[10px] text-white/30 leading-none mt-0.5">{ru ? 'по вашей библиотеке' : 'of your library'}</p>
-          </div>
+        <div className="flex items-center gap-2">
+          <TrendingUp className="w-4 h-4 text-primary/70" />
+          <h2 className="text-[15px] font-bold text-white/85 leading-none">{ru ? 'Статистика' : 'Statistics'}</h2>
         </div>
-
-        <div className="p-5 flex items-center gap-5">
-          {/* Radial success gauge */}
-          <div className="relative w-[86px] h-[86px] flex-shrink-0">
-            <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-              <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="9" />
-              <circle
-                cx="50" cy="50" r="42" fill="none" stroke="#1ed760" strokeWidth="9" strokeLinecap="round"
-                strokeDasharray={`${(successRate / 100) * 263.9} 263.9`}
-              />
-            </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-[20px] font-extrabold text-white leading-none">{successRate}%</span>
-              <span className="text-[9px] text-white/35 mt-0.5">{ru ? 'успех' : 'success'}</span>
-            </div>
-          </div>
-
-          <div className="flex-1 space-y-2.5 min-w-0">
-            <RailStat label={ru ? 'Скачано' : 'Downloaded'} value={stats.completedDownloads} color="#1ed760" />
-            <RailStat label={ru ? 'Ошибки' : 'Failed'}     value={stats.failedDownloads}    color="#ef4444" />
-            <RailStat label={ru ? 'Активных' : 'Active'}    value={activeCount}              color="#eab308" />
-          </div>
-        </div>
-
-        <div className="px-5 pb-4 flex items-center justify-between text-[11px]" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-          <span className="text-white/35 pt-3">{ru ? 'Занято н�� диске' : 'Storage used'}</span>
-          <span className="text-white/70 font-semibold pt-3">{stats.storageUsed || '—'}</span>
-        </div>
-      </motion.div>
-
-      {/* Supported platforms */}
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, ease: "easeOut", delay: 0.1 }}
-        className={card}
-        style={cardStyle}
-      >
-        <div className="px-5 pt-4 pb-3">
-          <h3 className="text-[13px] font-bold text-white/80 leading-tight">{ru ? 'Поддерживаемые сервисы' : 'Supported services'}</h3>
-        </div>
-        <div className="px-4 pb-4 grid grid-cols-2 gap-2">
-          {platforms.map((p) => (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { icon: <Download className="w-4 h-4" />, label: ru ? 'Всего' : 'Total', value: footerStats.totalDownloads, color: "#22d3ee" },
+            { icon: <CheckCircle2 className="w-4 h-4" />, label: ru ? 'Скачано' : 'Done', value: footerStats.completedDownloads, color: "#1ed760" },
+            { icon: <XCircle className="w-4 h-4" />, label: ru ? 'Ошибки' : 'Errors', value: footerStats.failedDownloads, color: "#ef4444" },
+            { icon: <HardDrive className="w-4 h-4" />, label: ru ? 'На диске' : 'Storage', value: footerStats.storageUsed || '—', color: "#a78bfa" },
+          ].map((s) => (
             <div
-              key={p.name}
-              className="flex items-center gap-2.5 rounded-xl px-3 py-2.5"
-              style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
+              key={s.label}
+              className="rounded-2xl px-4 py-3 flex items-center gap-3 backdrop-blur-xl"
+              style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}
             >
-              <p.Icon className="w-4 h-4 flex-shrink-0" style={{ color: p.color }} />
-              <span className="text-[12px] font-medium text-white/70 truncate">{p.name}</span>
+              <div
+                className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: `${s.color}14`, border: `1px solid ${s.color}30`, color: s.color }}
+              >
+                {s.icon}
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] text-white/30 leading-none">{s.label}</p>
+                <p className="text-[15px] font-bold text-white/85 leading-tight truncate">{s.value}</p>
+              </div>
             </div>
           ))}
         </div>
       </motion.div>
-
-      {/* Quality guide */}
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, ease: "easeOut", delay: 0.15 }}
-        className={card}
-        style={cardStyle}
-      >
-        <div className="px-5 pt-4 pb-3">
-          <h3 className="text-[13px] font-bold text-white/80 leading-tight">{ru ? 'Форматы и качество' : 'Formats & quality'}</h3>
-        </div>
-        <div className="px-4 pb-4 space-y-1.5">
-          {quality.map((q) => (
-            <div
-              key={q.fmt}
-              className="flex items-center gap-3 rounded-xl px-3 py-2.5"
-              style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.06)" }}
-            >
-              <span className="text-[12px] font-bold text-primary w-10 flex-shrink-0">{q.fmt}</span>
-              <span className="text-[11px] text-white/45 flex-1 leading-tight">{q.desc}</span>
-              <span className="text-[9px] font-semibold text-white/40 px-1.5 py-0.5 rounded-md flex-shrink-0" style={{ background: "rgba(30,215,96,0.1)", border: "1px solid rgba(30,215,96,0.18)" }}>
-                {q.tag}
-              </span>
-            </div>
-          ))}
-        </div>
-      </motion.div>
-    </div>
-  )
-}
-
-function RailStat({ label, value, color }: { label: string; value: number; color: string }) {
-  return (
-    <div className="flex items-center justify-between">
-      <div className="flex items-center gap-2 min-w-0">
-        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: color }} />
-        <span className="text-[12px] text-white/45 truncate">{label}</span>
-      </div>
-      <span className="text-[14px] font-bold text-white/80">{value}</span>
     </div>
   )
 }

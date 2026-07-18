@@ -87,26 +87,47 @@ export function PlayerPanel() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="relative max-w-5xl mx-auto space-y-6 pb-12">
+      {/* ── Ambient glow ────────────────────────────────── */}
+      <div
+        className="pointer-events-none absolute -top-20 left-1/2 -translate-x-1/2 w-[560px] h-[340px] rounded-full opacity-60"
+        style={{
+          background: "radial-gradient(ellipse at center, rgba(30,215,96,0.14) 0%, rgba(34,211,238,0.05) 45%, transparent 70%)",
+          filter: "blur(48px)",
+        }}
+      />
+
+      {/* ── Hero ────────────────────────────────────────── */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-between"
+        className="relative pt-8 text-center space-y-3"
       >
-        <div>
-          <h2 className="text-2xl font-bold">{lang === 'ru' ? 'Библиотека' : 'Library'}</h2>
-          <p className="text-sm text-muted-foreground mt-1">{lang === 'ru' ? 'Ваша коллекция музыки и плейлисты' : 'Your music collection & playlists'}</p>
+        <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight leading-tight">
+          <span className="text-white">{lang === 'ru' ? 'Твоя ' : 'Your '}</span>
+          <span
+            style={{
+              background: "linear-gradient(90deg, #1ed760 0%, #4ade80 50%, #22d3ee 100%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+            }}
+          >
+            {lang === 'ru' ? 'музыка' : 'music'}
+          </span>
+        </h1>
+        <p className="text-[13px] text-white/35">{lang === 'ru' ? 'Коллекция, любимые треки и плейлисты' : 'Your music collection & playlists'}</p>
+        <div className="flex justify-center">
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setShowCreatePlaylist(true)}
+            className="flex items-center gap-2 px-5 py-2 rounded-full text-[13px] font-semibold text-black transition-colors"
+            style={{ background: 'linear-gradient(90deg, #1ed760, #4ade80)', boxShadow: '0 8px 28px rgba(30,215,96,0.25)' }}
+          >
+            <Plus className="w-4 h-4" />
+            {lang === 'ru' ? 'Новый плейлист' : 'New Playlist'}
+          </motion.button>
         </div>
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => setShowCreatePlaylist(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors text-sm font-medium"
-        >
-          <Plus className="w-4 h-4" />
-          {lang === 'ru' ? 'Новый плейлист' : 'New Playlist'}
-        </motion.button>
       </motion.div>
 
       {/* Create Playlist Modal */}
@@ -116,7 +137,7 @@ export function PlayerPanel() {
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="rounded-2xl glass-accent p-6 space-y-4"
+            className="rounded-3xl border-[1.5px] border-primary/25 bg-primary/[0.05] backdrop-blur-xl p-6 space-y-4"
           >
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold flex items-center gap-2">
@@ -257,7 +278,7 @@ export function PlayerPanel() {
               <motion.div
                 key={pl.id}
                 layout
-                className={`rounded-xl glass-card overflow-hidden transition-colors ${
+                className={`rounded-2xl border-[1.5px] border-white/10 bg-white/[0.03] backdrop-blur-xl overflow-hidden transition-colors ${
                   isExpanded ? 'col-span-1 sm:col-span-2 !border-primary/25' : 'hover:!border-primary/20'
                 }`}
               >
@@ -466,7 +487,7 @@ export function PlayerPanel() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="rounded-2xl glass-card p-5"
+        className="rounded-3xl border-[1.5px] border-white/10 bg-white/[0.03] backdrop-blur-xl p-5"
       >
         <div className="flex items-center gap-2 mb-4">
           <Heart className="w-4 h-4 text-primary fill-current" />
@@ -521,7 +542,7 @@ export function PlayerPanel() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
-        className="rounded-2xl glass-card p-5"
+        className="rounded-3xl border-[1.5px] border-white/10 bg-white/[0.03] backdrop-blur-xl p-5"
       >
         <div className="flex items-center gap-2 mb-4">
           <ListMusic className="w-4 h-4 text-primary" />

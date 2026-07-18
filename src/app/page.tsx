@@ -14,6 +14,7 @@ import { StatsPanel } from '@/components/spotget/StatsPanel'
 import { HistoryPanel } from '@/components/spotget/HistoryPanel'
 import { LibraryPanel } from '@/components/spotget/LibraryPanel'
 import { SettingsPanel } from '@/components/spotget/SettingsPanel'
+import { WhatsNewModal } from '@/components/spotget/WhatsNewModal'
 import { Toaster } from '@/components/ui/toaster'
 
 const panels = {
@@ -63,6 +64,7 @@ export default function Page() {
 
       <AnimatePresence>{isPlayerOpen && <FullPlayer />}</AnimatePresence>
 
+      <WhatsNewModal />
       <Toaster />
     </div>
   )

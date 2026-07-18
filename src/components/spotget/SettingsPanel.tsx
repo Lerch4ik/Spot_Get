@@ -115,14 +115,36 @@ export function SettingsPanel() {
   }
 
   return (
-    <div className="space-y-6 max-w-5xl">
-      {/* Header */}
+    <div className="relative space-y-6 max-w-5xl mx-auto pb-12">
+      {/* ── Ambient glow ────────────────────────────────── */}
+      <div
+        className="pointer-events-none absolute -top-20 left-1/2 -translate-x-1/2 w-[560px] h-[340px] rounded-full opacity-60"
+        style={{
+          background: "radial-gradient(ellipse at center, rgba(30,215,96,0.14) 0%, rgba(34,211,238,0.05) 45%, transparent 70%)",
+          filter: "blur(48px)",
+        }}
+      />
+
+      {/* ── Hero ────────────────────────────────────────── */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
+        className="relative pt-8 text-center space-y-3"
       >
-        <h2 className="text-2xl font-bold">{t.settingsTitle}</h2>
-        <p className="text-sm text-muted-foreground mt-1">{lang === 'ru' ? 'Настройте параметры загрузки' : 'Configure your download preferences'}</p>
+        <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight leading-tight">
+          <span
+            style={{
+              background: "linear-gradient(90deg, #1ed760 0%, #4ade80 50%, #22d3ee 100%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+            }}
+          >
+            {t.settingsTitle}
+          </span>
+        </h1>
+        <p className="text-[13px] text-white/35">
+          {lang === 'ru' ? 'Настрой приложение под себя' : 'Configure your download preferences'}
+        </p>
       </motion.div>
 
       {/* Cards flow into two balanced columns on large screens so the
@@ -134,7 +156,7 @@ export function SettingsPanel() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="rounded-2xl glass-card p-6 space-y-5"
+        className="rounded-3xl border-[1.5px] border-white/10 bg-white/[0.03] backdrop-blur-xl p-6 space-y-5"
       >
         <h3 className="text-sm font-semibold flex items-center gap-2">
           <FileAudio className="w-4 h-4 text-primary" />
@@ -144,7 +166,7 @@ export function SettingsPanel() {
         {/* Output Directory */}
         <div>
           <label className="text-xs text-muted-foreground mb-2 flex items-center gap-1.5">
-            <FolderOpen className="w-3 h-3" /> {lang === 'ru' ? 'Папка сохранения' : 'Output Directory'}
+            <FolderOpen className="w-3 h-3" /> {lang === 'ru' ? 'Основная папка для музыки' : 'Base music folder'}
           </label>
           <div className="flex gap-2">
             <input
@@ -153,13 +175,13 @@ export function SettingsPanel() {
               onChange={(e) =>
                 setLocalSettings({ ...localSettings, outputDirectory: e.target.value })
               }
-              className="flex-1 px-4 py-2.5 rounded-xl bg-secondary border border-border text-sm focus:outline-none focus:border-primary focus:shadow-[0_0_0_2px_rgba(30,215,96,0.2)] transition-all"
+              className="flex-1 px-4 py-2.5 rounded-full text-sm text-white outline-none transition-all border-[1.5px] border-white/10 bg-white/[0.045] focus:border-primary/40 focus:shadow-[0_0_20px_rgba(30,215,96,0.12)]"
             />
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={handleBrowse}
-              className="px-4 py-2.5 rounded-xl bg-secondary border border-border hover:border-primary/50 text-sm transition-colors flex items-center gap-1.5"
+              className="px-4 py-2.5 rounded-full text-sm transition-colors flex items-center gap-1.5 border border-white/10 bg-white/[0.04] text-white/60 hover:text-white hover:border-primary/40"
             >
               <FolderOpen className="w-3.5 h-3.5" />
               {lang === 'ru' ? 'Обзор' : 'Browse'}
@@ -187,7 +209,7 @@ export function SettingsPanel() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="rounded-2xl glass-card p-6 space-y-5"
+        className="rounded-3xl border-[1.5px] border-white/10 bg-white/[0.03] backdrop-blur-xl p-6 space-y-5"
       >
         <h3 className="text-sm font-semibold flex items-center gap-2">
           <Gauge className="w-4 h-4 text-primary" />
@@ -226,7 +248,7 @@ export function SettingsPanel() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.25 }}
-        className="rounded-2xl glass-card p-6 space-y-4"
+        className="rounded-3xl border-[1.5px] border-white/10 bg-white/[0.03] backdrop-blur-xl p-6 space-y-4"
       >
         <h3 className="text-sm font-semibold flex items-center gap-2">
           <ShieldCheck className="w-4 h-4 text-primary" />
@@ -290,7 +312,7 @@ export function SettingsPanel() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
-        className="rounded-2xl glass-card p-6 space-y-5"
+        className="rounded-3xl border-[1.5px] border-white/10 bg-white/[0.03] backdrop-blur-xl p-6 space-y-5"
       >
         <h3 className="text-sm font-semibold flex items-center gap-2">
           <Moon className="w-4 h-4 text-primary" />
@@ -333,7 +355,7 @@ export function SettingsPanel() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.4 }}
-        className="rounded-2xl border border-destructive/20 bg-destructive/5 p-6 space-y-4"
+        className="rounded-3xl border-[1.5px] border-destructive/20 bg-destructive/5 p-6 space-y-4"
       >
         <h3 className="text-sm font-semibold text-destructive flex items-center gap-2">
           <Trash2 className="w-4 h-4" />
@@ -366,11 +388,12 @@ export function SettingsPanel() {
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
         onClick={handleSave}
-        className={`w-full py-3 rounded-xl font-bold text-sm transition-all duration-300 flex items-center justify-center gap-2 border ${
+        className={`w-full py-3 rounded-full font-bold text-sm transition-all duration-300 flex items-center justify-center gap-2 ${
           saved
-            ? 'bg-primary text-primary-foreground border-primary shadow-[0_0_20px_rgba(30,215,96,0.3)]'
-            : 'bg-primary/10 text-primary border-primary/30 hover:bg-primary/20 hover:border-primary/50'
+            ? 'bg-primary text-primary-foreground shadow-[0_0_28px_rgba(30,215,96,0.4)]'
+            : 'text-black shadow-[0_8px_28px_rgba(30,215,96,0.25)]'
         }`}
+        style={saved ? undefined : { background: 'linear-gradient(90deg, #1ed760, #4ade80)' }}
       >
         {saved ? (
           <>
@@ -388,7 +411,7 @@ export function SettingsPanel() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.6 }}
-        className="rounded-2xl glass-card p-6"
+        className="rounded-3xl border-[1.5px] border-white/10 bg-white/[0.03] backdrop-blur-xl p-6"
       >
         <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
           <Info className="w-4 h-4 text-primary" />
@@ -397,7 +420,7 @@ export function SettingsPanel() {
         <div className="space-y-2 text-xs text-muted-foreground">
           <div className="flex justify-between">
             <span>{lang === 'ru' ? 'Версия' : 'Version'}</span>
-            <span className="font-mono">{currentVersion || '2.8.2'}</span>
+            <span className="font-mono">{currentVersion || '2.8.4'}</span>
           </div>
           <div className="flex justify-between">
             <span>{lang === 'ru' ? 'Движок' : 'Engine'}</span>
@@ -452,7 +475,7 @@ export function SettingsPanel() {
           <button
             onClick={() => checkUpdate(false)}
             disabled={updatePhase === 'checking'}
-            className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl glass-card text-xs font-medium text-muted-foreground hover:text-foreground transition-colors disabled:opacity-60"
+            className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-full border border-white/10 bg-white/[0.04] text-xs font-medium text-white/55 hover:text-white transition-colors disabled:opacity-60"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${updatePhase === 'checking' ? 'animate-spin' : ''}`} />
             {updatePhase === 'checking'
@@ -467,7 +490,7 @@ export function SettingsPanel() {
               ;(window as any).electronAPI.openLogsFolder()
             }
           }}
-          className="mt-2 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl glass-card text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+          className="mt-2 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-full border border-white/10 bg-white/[0.04] text-xs font-medium text-white/55 hover:text-white transition-colors"
         >
           <FolderOpen className="w-3.5 h-3.5" />
           {lang === 'ru' ? 'Открыть папку логов (spot.log)' : 'Open logs folder (spot.log)'}
