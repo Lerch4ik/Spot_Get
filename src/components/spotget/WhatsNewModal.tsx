@@ -68,8 +68,8 @@ export function WhatsNewModal() {
             onClick={(e) => e.stopPropagation()}
             className="relative w-full max-w-md rounded-3xl p-8 text-center overflow-hidden"
             style={{
-              background: 'rgba(18,18,18,0.97)',
-              border: '1.5px solid rgba(255,255,255,0.1)',
+              background: 'var(--popover)',
+              border: '1.5px solid var(--wa-10)',
               boxShadow: '0 24px 80px rgba(0,0,0,0.6)',
             }}
           >

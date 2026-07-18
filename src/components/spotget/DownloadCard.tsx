@@ -113,10 +113,10 @@ export function DownloadCard({ download, subTracks = [], onCancel }: DownloadCar
       style={{
         background: isActive
           ? `linear-gradient(135deg, ${platformColor}0a 0%, transparent 60%)`
-          : "rgba(255,255,255,0.025)",
+          : "var(--wa-025)",
         border: isActive
           ? `1px solid ${platformColor}28`
-          : "1px solid rgba(255,255,255,0.06)",
+          : "1px solid var(--wa-06)",
       }}
     >
       {/* Left accent bar — active only */}
@@ -226,7 +226,7 @@ export function DownloadCard({ download, subTracks = [], onCancel }: DownloadCar
               exit={{ opacity: 0 }}
               className="mt-2 h-[3px] rounded-full overflow-hidden"
               style={{
-                background: "rgba(255,255,255,0.06)",
+                background: "var(--wa-06)",
                 transformOrigin: "left",
               }}
             >
@@ -318,7 +318,7 @@ export function DownloadCard({ download, subTracks = [], onCancel }: DownloadCar
                     style={{
                       background: isTrackActive
                         ? `linear-gradient(135deg, ${trackColor}08 0%, transparent 60%)`
-                        : "rgba(255,255,255,0.02)",
+                        : "var(--wa-02)",
                     }}
                   >
                     {/* Track status icon */}
@@ -373,7 +373,7 @@ export function DownloadCard({ download, subTracks = [], onCancel }: DownloadCar
                     {/* Mini progress bar for active tracks */}
                     {isTrackActive && (
                       <div className="absolute bottom-0 left-2 right-2 h-[1px] rounded-full overflow-hidden"
-                        style={{ background: "rgba(255,255,255,0.04)" }}>
+                        style={{ background: "var(--wa-04)" }}>
                         <div
                           className="h-full rounded-full transition-all duration-300"
                           style={{

@@ -367,13 +367,13 @@ export function DownloadPanel() {
         <div
           className="flex items-center gap-2 rounded-full pl-5 pr-2 py-2 backdrop-blur-xl transition-all"
           style={{
-            background: "rgba(255,255,255,0.045)",
+            background: "var(--wa-045)",
             border: url && platform !== "unknown"
               ? `1.5px solid ${platformColor}55`
-              : "1.5px solid rgba(255,255,255,0.09)",
+              : "1.5px solid var(--wa-09)",
             boxShadow: url && platform !== "unknown"
-              ? `0 0 36px ${platformColor}22, inset 0 1px 0 rgba(255,255,255,0.06)`
-              : "0 8px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06)",
+              ? `0 0 36px ${platformColor}22, inset 0 1px 0 var(--wa-06)`
+              : "0 8px 32px rgba(0,0,0,0.35), inset 0 1px 0 var(--wa-06)",
           }}
         >
           {platform !== "unknown" && url ? (
@@ -448,11 +448,11 @@ export function DownloadPanel() {
         <div
           className="flex items-center gap-2 rounded-full pl-5 pr-4 py-1 backdrop-blur-xl"
           style={{
-            background: "rgba(255,255,255,0.03)",
-            border: folderName.trim() ? "1.5px solid rgba(34,197,94,0.35)" : "1.5px solid rgba(255,255,255,0.07)",
+            background: "var(--wa-03)",
+            border: folderName.trim() ? "1.5px solid rgba(34,197,94,0.35)" : "1.5px solid var(--wa-07)",
           }}
         >
-          <FolderOpen className="w-4 h-4 flex-shrink-0" style={{ color: folderName.trim() ? "#22c55e" : "rgba(255,255,255,0.2)" }} />
+          <FolderOpen className="w-4 h-4 flex-shrink-0" style={{ color: folderName.trim() ? "#22c55e" : "var(--wa-20)" }} />
           <input
             type="text"
             placeholder={ru ? 'Название папки (необязательно) — например, название плейлиста' : 'Folder name (optional) — e.g. playlist name'}
@@ -474,9 +474,9 @@ export function DownloadPanel() {
                 onClick={() => setFolderName(folderName === name ? "" : name)}
                 className="px-3 py-1 rounded-full text-[11px] transition-colors"
                 style={{
-                  background: folderName === name ? "rgba(30,215,96,0.12)" : "rgba(255,255,255,0.04)",
-                  border: folderName === name ? "1px solid rgba(30,215,96,0.3)" : "1px solid rgba(255,255,255,0.08)",
-                  color: folderName === name ? "#1ed760" : "rgba(255,255,255,0.45)",
+                  background: folderName === name ? "rgba(30,215,96,0.12)" : "var(--wa-04)",
+                  border: folderName === name ? "1px solid rgba(30,215,96,0.3)" : "1px solid var(--wa-08)",
+                  color: folderName === name ? "#1ed760" : "var(--wa-45)",
                 }}
               >
                 {name}
@@ -516,7 +516,7 @@ export function DownloadPanel() {
             exit={{ opacity: 0, y: -8 }}
             className="rounded-2xl px-5 py-4 backdrop-blur-xl flex items-center gap-4"
             style={{
-              background: "linear-gradient(135deg, rgba(30,215,96,0.07), rgba(255,255,255,0.02))",
+              background: "linear-gradient(135deg, rgba(30,215,96,0.07), var(--wa-02))",
               border: "1px solid rgba(30,215,96,0.2)",
             }}
           >
@@ -529,7 +529,7 @@ export function DownloadPanel() {
                   <span className="text-destructive ml-2">{sessionFailedCount} {ru ? 'ошибок' : 'failed'}</span>
                 )}
               </p>
-              <div className="mt-2 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.07)" }}>
+              <div className="mt-2 h-1.5 rounded-full overflow-hidden" style={{ background: "var(--wa-07)" }}>
                 <div
                   className="h-full rounded-full transition-all duration-500"
                   style={{ width: `${sessionProgress}%`, background: "linear-gradient(90deg, #1ed760, #4ade80)" }}
@@ -556,7 +556,7 @@ export function DownloadPanel() {
             {visibleDownloads.length > 0 && (
               <span
                 className="px-2 py-0.5 rounded-full text-[10px] font-bold"
-                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.4)" }}
+                style={{ background: "var(--wa-05)", border: "1px solid var(--wa-08)", color: "var(--wa-40)" }}
               >
                 {visibleDownloads.length}
               </span>
@@ -575,7 +575,7 @@ export function DownloadPanel() {
             {completedDownloads.length > 0 && activeCount === 0 && (
               <div
                 className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium"
-                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.4)" }}
+                style={{ background: "var(--wa-04)", border: "1px solid var(--wa-08)", color: "var(--wa-40)" }}
               >
                 <CheckCircle2 className="w-3 h-3" />
                 {completedDownloads.length} {ru ? 'завершено' : 'completed'}
@@ -612,7 +612,7 @@ export function DownloadPanel() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 className="flex flex-col items-center justify-center py-16 text-center gap-4 rounded-2xl"
-                style={{ border: "1px dashed rgba(255,255,255,0.08)" }}
+                style={{ border: "1px dashed var(--wa-08)" }}
               >
                 <div
                   className="w-16 h-16 rounded-full flex items-center justify-center"
@@ -668,7 +668,7 @@ export function DownloadPanel() {
             <div
               key={s.label}
               className="rounded-2xl px-4 py-3 flex items-center gap-3 backdrop-blur-xl"
-              style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}
+              style={{ background: "var(--wa-03)", border: "1px solid var(--wa-07)" }}
             >
               <div
                 className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"

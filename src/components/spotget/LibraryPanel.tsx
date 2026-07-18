@@ -88,7 +88,7 @@ export function LibraryPanel() {
               type="button"
               onClick={handleImport}
               className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[12px] font-medium text-white/55 hover:text-white transition-colors"
-              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)" }}
+              style={{ background: "var(--wa-04)", border: "1px solid var(--wa-09)" }}
             >
               <FolderOpen className="w-3.5 h-3.5" />
               {t.importLibrary}
@@ -142,7 +142,7 @@ export function LibraryPanel() {
       {currentTracks.length === 0 ? (
         <div
           className="flex flex-col items-center justify-center py-20 gap-4 rounded-2xl"
-          style={{ border: "1px dashed rgba(255,255,255,0.08)" }}
+          style={{ border: "1px dashed var(--wa-08)" }}
         >
           <div
             className="w-16 h-16 rounded-full flex items-center justify-center"

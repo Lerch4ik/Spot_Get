@@ -180,7 +180,7 @@ export function StatsPanel() {
             type="button"
             onClick={handleExportStats}
             className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[12px] font-medium text-white/55 hover:text-white transition-colors"
-            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)" }}
+            style={{ background: "var(--wa-04)", border: "1px solid var(--wa-09)" }}
           >
             <ExportIcon className="w-3.5 h-3.5" />
             {t.exportStats}
@@ -250,7 +250,7 @@ export function StatsPanel() {
                 />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: '#1a1a1a',
+                    backgroundColor: 'var(--popover)',
                     border: '1px solid #2a2a2a',
                     borderRadius: '8px',
                     fontSize: '12px',
@@ -298,7 +298,7 @@ export function StatsPanel() {
                 </Pie>
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: '#1a1a1a',
+                    backgroundColor: 'var(--popover)',
                     border: '1px solid #2a2a2a',
                     borderRadius: '8px',
                     fontSize: '12px',
@@ -391,7 +391,7 @@ export function StatsPanel() {
                 />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: '#1a1a1a',
+                    backgroundColor: 'var(--popover)',
                     border: '1px solid #2a2a2a',
                     borderRadius: '8px',
                     fontSize: '12px',

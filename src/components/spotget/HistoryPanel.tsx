@@ -121,7 +121,7 @@ export function HistoryPanel() {
             type="button"
             onClick={handleExportHistory}
             className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[12px] font-medium text-white/55 hover:text-white transition-colors"
-            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)" }}
+            style={{ background: "var(--wa-04)", border: "1px solid var(--wa-09)" }}
           >
             <ExportIcon className="w-3.5 h-3.5" />
             {t.exportHistory}
@@ -130,7 +130,7 @@ export function HistoryPanel() {
             type="button"
             onClick={handleImportHistory}
             className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[12px] font-medium text-white/55 hover:text-white transition-colors"
-            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)" }}
+            style={{ background: "var(--wa-04)", border: "1px solid var(--wa-09)" }}
           >
             <ImportIcon className="w-3.5 h-3.5" />
             {t.importHistory}
