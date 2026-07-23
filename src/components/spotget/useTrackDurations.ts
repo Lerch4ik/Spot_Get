@@ -11,15 +11,20 @@ import { useSpotgetStore, getCachedDuration } from '@/lib/store'
  * each such track's metadata in a throwaway <audio> element (which works for
  * every format the app can play) and writes the result back to the store.
  *
- * Work is done with limited concurrency so we never spawn hundreds of audio
- * elements at once, and every id is only ever attempted once per session.
- *
- * Results are flushed to the store in BATCHES: with 500+ imported tracks,
- * one store update per track would re-render the whole track list hundreds
- * of times and rewrite the duration cache on every single track, which
- * freezes the UI.
+ * IMPORTANT — this must never make the app feel slow:
+ * - Scanning starts only AFTER a startup delay, so the UI opens instantly
+ *   and the first paint / library load are never blocked by disk reads.
+ * - Concurrency is low (2 files at a time) and there is a small pause
+ *   between files, so the scan quietly trickles in the background instead
+ *   of hammering the disk and the renderer process.
+ * - Results are flushed to the store in BATCHES: with 500+ tracks, one
+ *   store update per track would re-render the whole track list hundreds
+ *   of times, which freezes the UI.
+ * - Every id is only ever attempted once per session.
  */
-const CONCURRENCY = 8
+const START_DELAY_MS = 3500
+const CONCURRENCY = 2
+const GAP_MS = 50
 const FLUSH_EVERY = 25
 
 export function useTrackDurations(tracks: Array<{ id: string; audioUrl?: string; duration?: number }>) {
@@ -47,6 +52,8 @@ export function useTrackDurations(tracks: Array<{ id: string; audioUrl?: string;
       buffered = 0
       updateTrackDurations(batch)
     }
+
+    const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 
     const measure = (audioUrl: string) =>
       new Promise<number>((resolve) => {
@@ -84,18 +91,26 @@ export function useTrackDurations(tracks: Array<{ id: string; audioUrl?: string;
         } catch {
           // ignore — leave as 0:00 for this file
         }
+        // Small breather between files so the scan never competes with the UI
+        // or with music playback for the disk.
+        await sleep(GAP_MS)
       }
     }
 
-    const workers = Array.from({ length: Math.min(CONCURRENCY, queue.length) }, worker)
-    Promise.all(workers)
-      .then(() => {
-        if (!cancelled) flush()
-      })
-      .catch(() => {})
+    let started = false
+    const timer = setTimeout(() => {
+      started = true
+      const workers = Array.from({ length: Math.min(CONCURRENCY, queue.length) }, worker)
+      Promise.all(workers)
+        .then(() => {
+          if (!cancelled) flush()
+        })
+        .catch(() => {})
+    }, START_DELAY_MS)
 
     return () => {
       cancelled = true
+      if (!started) clearTimeout(timer)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signature])

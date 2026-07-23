@@ -40,6 +40,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   exportStats: (data) => ipcRenderer.invoke('export:stats', data),
   importLibrary: () => ipcRenderer.invoke('library:import'),
   getLibraryDir: () => ipcRenderer.invoke('library:getDir'),
+  removeLibraryFolder: (folder) => ipcRenderer.invoke('library:removeFolder', folder),
 
   // Download
   startDownload: (opts) => ipcRenderer.invoke('download:start', opts),

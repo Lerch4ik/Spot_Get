@@ -24,8 +24,9 @@ export interface ElectronAPI {
   exportHistory: (data: any[]) => Promise<{ success: boolean; filePath?: string }>
   importHistory: () => Promise<{ success: boolean; data?: any[]; error?: string }>
   exportStats: (data: any) => Promise<{ success: boolean; filePath?: string }>
-  importLibrary: () => Promise<{ success: boolean; tracks?: any[]; folder?: string; error?: string }>
-  getLibraryDir: () => Promise<{ tracks: any[]; folder?: string }>
+  importLibrary: () => Promise<{ success: boolean; tracks?: any[]; folders?: string[]; folder?: string; error?: string }>
+  getLibraryDir: () => Promise<{ tracks: any[]; folders?: string[]; folder?: string }>
+  removeLibraryFolder: (folder: string) => Promise<{ success: boolean; tracks?: any[]; folders?: string[]; folder?: string }>
 
   // YouTube cookies (bot-check bypass) — automatic in-app login
   cookiesStatus?: () => Promise<{ hasCookies: boolean; path: string }>

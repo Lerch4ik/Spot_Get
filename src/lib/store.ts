@@ -56,6 +56,12 @@ export interface Settings {
   skipExisting: boolean
   scanThreads: number
   theme: "dark" | "light"
+  // Voice ducking — automatically lower the music volume when the microphone
+  // hears speech (e.g. a Discord conversation). Optional so that settings
+  // saved by older versions keep working.
+  duckingEnabled?: boolean
+  duckingLevel?: number // volume multiplier while voice is detected: 0.5, 0.2 or 0 (mute)
+  duckingSensitivity?: "low" | "medium" | "high"
 }
 
 export interface Stats {
@@ -390,7 +396,8 @@ interface SpotgetState {
 
   libraryTracks: any[]
   libraryFolder: string | null
-  loadLibrary: (tracks: any[], folder: string) => void
+  libraryFolders: string[]
+  loadLibrary: (tracks: any[], folders: string[] | string) => void
 
   totalTracksCount: number | null
   completedTracksCount: number | null
@@ -612,6 +619,9 @@ export const useSpotgetStore = create<SpotgetState>((set, get) => ({
     skipExisting: true,
     scanThreads: 4,
     theme: "dark",
+    duckingEnabled: false,
+    duckingLevel: 0.2,
+    duckingSensitivity: "medium",
   },
   updateSettings: (updates) =>
     set((s) => {
@@ -848,7 +858,11 @@ export const useSpotgetStore = create<SpotgetState>((set, get) => ({
 
   libraryTracks: [],
   libraryFolder: null,
-  loadLibrary: (tracks, folder) => set({ libraryTracks: tracks, libraryFolder: folder }),
+  libraryFolders: [],
+  loadLibrary: (tracks, folders) => {
+    const list = Array.isArray(folders) ? folders : folders ? [folders] : []
+    set({ libraryTracks: tracks, libraryFolders: list, libraryFolder: list[0] || null })
+  },
 
   totalTracksCount: null,
   completedTracksCount: null,

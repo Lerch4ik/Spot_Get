@@ -7,6 +7,7 @@ import {
   FileAudio,
   Gauge,
   ScanSearch,
+  Mic,
   Moon,
   Sun,
   Trash2,
@@ -243,6 +244,98 @@ export function SettingsPanel() {
 
       </motion.div>
 
+      {/* Voice ducking — auto-lower volume when someone talks (Discord etc.) */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.22 }}
+        className="rounded-3xl border-[1.5px] border-white/10 bg-white/[0.03] backdrop-blur-xl p-6 space-y-5"
+      >
+        <h3 className="text-sm font-semibold flex items-center gap-2">
+          <Mic className="w-4 h-4 text-primary" />
+          {lang === 'ru' ? 'Приглушение при разговоре' : 'Voice Ducking'}
+        </h3>
+
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          {lang === 'ru'
+            ? 'Когда микрофон слышит речь (например, вы разговариваете в Discord), музыка автоматически становится тише или выключается, а через пару секунд тишины громкость возвращается. Голоса собеседников распознаются, если они слышны через колонки; в наушниках приглушение срабатывает от вашего голоса. Собственная музыка приложения приглушение не вызывает.'
+            : "When the microphone hears speech (e.g. you're talking in Discord), the music automatically gets quieter or mutes, and comes back a couple of seconds after the talking stops. Friends' voices are detected when they play through speakers; with headphones, ducking reacts to your own voice. The app's own music never triggers it."}
+        </p>
+
+        {/* Enable toggle */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Mic className="w-4 h-4 text-muted-foreground" />
+            <div>
+              <p className="text-sm">{lang === 'ru' ? 'Включить' : 'Enable'}</p>
+              <p className="text-xs text-muted-foreground">{lang === 'ru' ? 'Использует микрофон (разрешение запрашивается один раз)' : 'Uses the microphone (permission asked once)'}</p>
+            </div>
+          </div>
+          <button
+            onClick={() =>
+              setLocalSettings({ ...localSettings, duckingEnabled: !localSettings.duckingEnabled })
+            }
+            className={`relative w-11 h-6 rounded-full transition-colors ${
+              localSettings.duckingEnabled ? 'bg-primary' : 'bg-secondary'
+            }`}
+          >
+            <motion.div
+              animate={{ x: localSettings.duckingEnabled ? 20 : 2 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+              className="absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm"
+            />
+          </button>
+        </div>
+
+        {/* How much to duck */}
+        <div>
+          <p className="text-sm mb-2">{lang === 'ru' ? 'Насколько приглушать' : 'Duck to'}</p>
+          <div className="flex flex-wrap gap-2">
+            {([
+              { v: 0.5, label: lang === 'ru' ? 'Тише (50%)' : 'Quieter (50%)' },
+              { v: 0.2, label: lang === 'ru' ? 'Сильно (20%)' : 'Strong (20%)' },
+              { v: 0, label: lang === 'ru' ? 'В ноль (0%)' : 'Mute (0%)' },
+            ] as const).map((opt) => (
+              <button
+                key={opt.v}
+                onClick={() => setLocalSettings({ ...localSettings, duckingLevel: opt.v })}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                  (localSettings.duckingLevel ?? 0.2) === opt.v
+                    ? 'bg-primary/10 text-primary border-primary/30'
+                    : 'bg-secondary text-muted-foreground border-border hover:text-foreground'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Sensitivity */}
+        <div>
+          <p className="text-sm mb-2">{lang === 'ru' ? 'Чувствительность микрофона' : 'Microphone sensitivity'}</p>
+          <div className="flex flex-wrap gap-2">
+            {([
+              { v: 'low', label: lang === 'ru' ? 'Низкая' : 'Low' },
+              { v: 'medium', label: lang === 'ru' ? 'Средняя' : 'Medium' },
+              { v: 'high', label: lang === 'ru' ? 'Высокая' : 'High' },
+            ] as const).map((opt) => (
+              <button
+                key={opt.v}
+                onClick={() => setLocalSettings({ ...localSettings, duckingSensitivity: opt.v })}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                  (localSettings.duckingSensitivity ?? 'medium') === opt.v
+                    ? 'bg-primary/10 text-primary border-primary/30'
+                    : 'bg-secondary text-muted-foreground border-border hover:text-foreground'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </motion.div>
+
       {/* YouTube Cookies (bot-check bypass) */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -420,7 +513,7 @@ export function SettingsPanel() {
         <div className="space-y-2 text-xs text-muted-foreground">
           <div className="flex justify-between">
             <span>{lang === 'ru' ? 'Версия' : 'Version'}</span>
-            <span className="font-mono">{currentVersion || '2.8.5'}</span>
+            <span className="font-mono">{currentVersion || '2.8.6'}</span>
           </div>
           <div className="flex justify-between">
             <span>{lang === 'ru' ? 'Движок' : 'Engine'}</span>

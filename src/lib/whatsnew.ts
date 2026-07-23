@@ -8,17 +8,21 @@
 
 export const WHATS_NEW: { ru: string[]; en: string[] } = {
   ru: [
-    'Огромный прирост производительности: все списки треков виртуализированы — больше никаких лагов, даже с тысячами треков',
-    'Поиск и сортировка на каждой странице с треками',
-    'Длительности треков теперь загружаются в фоне сразу при запуске приложения',
-    'Исправлено: скачанный плейлист показывал меньше треков, чем реально сохранено',
-    'Новый читаемый выпадающий список сортировки в тёмной теме',
+    'Новое: приглушение музыки при разговоре — когда микрофон слышит речь (например, в Discord), громкость автоматически снижается. Включается и настраивается в Настройках',
+    'Новое: импорт нескольких папок с музыкой — добавляйте сколько угодно папок, слушайте любую отдельно или несколько вместе',
+    'Списки треков больше не тормозят даже с тысячами песен',
+    'Приложение больше не зависает при запуске — длительности треков подгружаются в фоне',
+    'Поиск и сортировка во всех списках: библиотека, плеер, очередь, история',
+    'Исправлен полноэкранный плеер: кнопки окна не перекрываются, обложка не обрезается при изменении размера окна',
+    'Исправлен подсчёт уже скачанных треков в плейлистах',
   ],
   en: [
-    'Huge performance boost: all track lists are now virtualized — no more lag, even with thousands of tracks',
-    'Search and sorting on every page with tracks',
-    'Track durations now load in the background from app startup',
-    'Fixed playlist downloads showing fewer tracks than were actually saved',
-    'New readable sort dropdown in dark theme',
+    'New: voice ducking — when the microphone hears speech (e.g. in Discord), the music volume is lowered automatically. Enable and tune it in Settings',
+    'New: import multiple music folders — add as many folders as you like, play any one of them or several together',
+    'Track lists no longer lag, even with thousands of songs',
+    'The app no longer freezes on startup — track durations load in the background',
+    'Search and sorting in every list: library, player, queue, history',
+    'Full-screen player fixed: window buttons are never covered, artwork no longer clips when resizing',
+    'Fixed counting of already-downloaded tracks in playlists',
   ],
 }

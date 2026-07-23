@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Music, Play, FolderOpen, Download, FolderInput } from 'lucide-react'
+import { Music, Play, FolderOpen, Download, FolderInput, X } from 'lucide-react'
 import { useSpotgetStore, buildDownloadedTracks, buildImportedTracks } from '@/lib/store'
 import { translations } from '@/lib/i18n'
 import { AddToPlaylistButton } from './AddToPlaylistButton'
@@ -17,7 +17,7 @@ export function LibraryPanel() {
   const {
     lang,
     libraryTracks,
-    libraryFolder,
+    libraryFolders,
     loadLibrary,
     playTrack,
     addToQueue,
@@ -28,12 +28,14 @@ export function LibraryPanel() {
   const [activeTab, setActiveTab] = useState<LibraryTab>('downloaded')
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<TrackSortMode>('default')
+  // Folder filter for the "Imported" tab: empty = show every folder together.
+  const [selectedFolders, setSelectedFolders] = useState<string[]>([])
 
   useEffect(() => {
     if (typeof window !== 'undefined' && window.electronAPI?.getLibraryDir) {
       window.electronAPI.getLibraryDir().then((result: any) => {
-        if (result?.tracks?.length) {
-          loadLibrary(result.tracks, result.folder || '')
+        if (result?.tracks?.length || result?.folders?.length) {
+          loadLibrary(result.tracks || [], result.folders ?? result.folder ?? [])
         }
       })
     }
@@ -42,9 +44,34 @@ export function LibraryPanel() {
   const handleImport = async () => {
     if (!window.electronAPI?.importLibrary) return
     const result = await window.electronAPI.importLibrary()
-    if (result?.tracks?.length) {
-      loadLibrary(result.tracks, result.folder || '')
+    if (result?.tracks?.length || result?.folders?.length) {
+      loadLibrary(result.tracks || [], result.folders ?? result.folder ?? [])
     }
+  }
+
+  // Toggle a folder in the filter (click on a chip).
+  const toggleFolder = (folder: string) => {
+    setSelectedFolders((prev) =>
+      prev.includes(folder) ? prev.filter((f) => f !== folder) : [...prev, folder],
+    )
+  }
+
+  // Play ONLY the tracks of one folder (▶ on a chip).
+  const playFolder = (folder: string) => {
+    const tracks = sortTracks(
+      importedTracks.filter((t: any) => t.folder === folder),
+      sort,
+    )
+    if (tracks.length) playTrack(tracks[0], tracks)
+  }
+
+  // Remove a folder from the app (files on disk stay untouched).
+  const removeFolder = async (folder: string) => {
+    const api = window.electronAPI as any
+    if (!api?.removeLibraryFolder) return
+    const result = await api.removeLibraryFolder(folder)
+    loadLibrary(result?.tracks || [], result?.folders || [])
+    setSelectedFolders((prev) => prev.filter((f) => f !== folder))
   }
 
   // Build "downloaded" tracks from completed downloads in history
@@ -53,7 +80,12 @@ export function LibraryPanel() {
   // which is completely independent of the download folder.
   const importedTracks = buildImportedTracks(libraryTracks)
 
-  const currentTracks = activeTab === 'downloaded' ? downloadedTracks : importedTracks
+  // Folder filter: when some chips are selected, show only those folders'
+  // tracks (they play together as one queue); otherwise show everything.
+  const importedVisible = selectedFolders.length
+    ? importedTracks.filter((t: any) => selectedFolders.includes(t.folder))
+    : importedTracks
+  const currentTracks = activeTab === 'downloaded' ? downloadedTracks : importedVisible
   // Apply the search + sort controls; the virtual list below renders only the
   // visible rows, so even thousands of tracks scroll without lag.
   const visibleTracks = sortTracks(filterTracks(currentTracks, search), sort)
@@ -141,9 +173,60 @@ export function LibraryPanel() {
         </button>
       </div>
 
-      {/* Folder info for imported tab */}
-      {activeTab === 'imported' && libraryFolder && (
-        <p className="text-center text-[10px] text-white/25 truncate">{libraryFolder}</p>
+      {/* Imported folders — chips: click = filter, ▶ = play that folder, × = remove */}
+      {activeTab === 'imported' && libraryFolders.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            {libraryFolders.map((folder) => {
+              const name = folder.split(/[\\/]/).filter(Boolean).pop() || folder
+              const count = importedTracks.filter((t: any) => t.folder === folder).length
+              const selected = selectedFolders.includes(folder)
+              return (
+                <div
+                  key={folder}
+                  onClick={() => toggleFolder(folder)}
+                  title={folder}
+                  className={`flex items-center gap-1.5 pl-3 pr-1.5 py-1.5 rounded-full text-[12px] font-medium cursor-pointer transition-colors ${
+                    selected ? 'text-primary' : 'text-white/55 hover:text-white'
+                  }`}
+                  style={{
+                    background: selected ? 'rgba(30,215,96,0.12)' : 'var(--wa-04)',
+                    border: selected ? '1px solid rgba(30,215,96,0.35)' : '1px solid var(--wa-09)',
+                  }}
+                >
+                  <FolderOpen className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span className="max-w-[140px] truncate">{name}</span>
+                  <span className="text-[10px] opacity-60">{count}</span>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); playFolder(folder) }}
+                    className="p-1 rounded-full hover:bg-white/10 text-green-400"
+                    title={lang === 'ru' ? 'Играть эту папку' : 'Play this folder'}
+                  >
+                    <Play className="w-3 h-3" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); removeFolder(folder) }}
+                    className="p-1 rounded-full hover:bg-white/10 text-white/40 hover:text-red-400"
+                    title={lang === 'ru' ? 'Убрать папку (файлы останутся на диске)' : 'Remove folder (files stay on disk)'}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+          <p className="text-center text-[10px] text-white/25">
+            {selectedFolders.length > 0
+              ? lang === 'ru'
+                ? `Показаны треки из выбранных папок (${selectedFolders.length}) — они играют вместе одной очередью`
+                : `Showing tracks from ${selectedFolders.length} selected folder(s) — they play together as one queue`
+              : lang === 'ru'
+                ? 'Нажми на папку, чтобы выбрать одну или несколько • ▶ — играть только её • × — убрать'
+                : 'Click a folder to select one or more • ▶ plays only that folder • × removes it'}
+          </p>
+        </div>
       )}
 
       {/* Track list */}
@@ -175,9 +258,20 @@ export function LibraryPanel() {
         </div>
       ) : (
         <div className="space-y-1">
-          <p className="text-xs text-muted-foreground mb-3">
-            {visibleTracks.length} {t.tracks}
-          </p>
+          <div className="flex items-center gap-3 mb-3">
+            <p className="text-xs text-muted-foreground">
+              {visibleTracks.length} {t.tracks}
+            </p>
+            <button
+              type="button"
+              onClick={() => { if (visibleTracks.length) playTrack(visibleTracks[0], visibleTracks) }}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium text-green-400 hover:text-green-300 transition-colors"
+              style={{ background: 'var(--wa-04)', border: '1px solid var(--wa-09)' }}
+            >
+              <Play className="w-3 h-3" />
+              {lang === 'ru' ? 'Слушать всё' : 'Play all'}
+            </button>
+          </div>
           <TrackListControls search={search} onSearch={setSearch} sort={sort} onSort={setSort} lang={lang} />
           <VirtualList
             items={visibleTracks}

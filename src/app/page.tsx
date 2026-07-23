@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useSpotgetStore, buildDownloadedTracks, buildImportedTracks } from '@/lib/store'
 import { useAudio } from '@/hooks/useAudio'
+import { useVoiceDucking } from '@/hooks/useVoiceDucking'
 import { TitleBar } from '@/components/spotget/TitleBar'
 import { Sidebar } from '@/components/spotget/Sidebar'
 import { MiniPlayer } from '@/components/spotget/MiniPlayer'
@@ -33,6 +34,9 @@ const panels = {
 export default function Page() {
   // Mount the shared <audio> engine so playback works app-wide.
   useAudio()
+  // Auto-duck the music volume when the microphone hears speech (Discord
+  // calls etc.) — configurable in Settings.
+  useVoiceDucking()
 
   const downloads = useSpotgetStore((s) => s.downloads)
   const libraryTracks = useSpotgetStore((s) => s.libraryTracks)
@@ -48,10 +52,15 @@ export default function Page() {
     }
   }, [loadLibrary])
 
-  // Scan missing track durations in the background from the moment the app
-  // opens — not only while the Player tab is visible — so durations appear
-  // everywhere (queue, library, player) without waiting.
-  useTrackDurations([...buildDownloadedTracks(downloads), ...buildImportedTracks(libraryTracks)])
+  // Scan missing track durations in the background — the hook itself waits a
+  // few seconds after startup and then trickles slowly, so the app opens
+  // instantly and never stutters because of the scan. Memoized so the track
+  // list isn't rebuilt on every unrelated re-render.
+  const allTracksForDurations = useMemo(
+    () => [...buildDownloadedTracks(downloads), ...buildImportedTracks(libraryTracks)],
+    [downloads, libraryTracks],
+  )
+  useTrackDurations(allTracksForDurations)
 
   const activePanel = useSpotgetStore((s) => s.activePanel)
   const isPlayerOpen = useSpotgetStore((s) => s.isPlayerOpen)

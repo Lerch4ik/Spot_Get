@@ -64,6 +64,11 @@ export function FullPlayer() {
   const [showSpeedMenu, setShowSpeedMenu] = useState(false)
   const [showPlaylistMenu, setShowPlaylistMenu] = useState(false)
 
+  // In Electron the custom TitleBar (with minimize/maximize/close) is 36px
+  // tall. The full player must start BELOW it, otherwise it covers the
+  // window controls and the app can't be minimized.
+  const hasTitleBar = typeof window !== 'undefined' && !!(window as any).electronAPI
+
   // Tracks queued before the artwork fix may lack thumbnailUrl —
   // fall back to the artwork stored on the matching download record.
   const downloads = useSpotgetStore((s) => s.downloads)
@@ -102,7 +107,8 @@ export function FullPlayer() {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 40 }}
       transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-      className="fixed inset-0 z-50 flex flex-col overflow-hidden"
+      className="fixed inset-x-0 bottom-0 z-50 flex flex-col overflow-hidden"
+      style={{ top: hasTitleBar ? 36 : 0 }}
     >
       {/* Solid base so nothing leaks through */}
       <div className="absolute inset-0 bg-background" />
@@ -190,9 +196,9 @@ export function FullPlayer() {
         </AnimatePresence>
 
         {/* Main content area */}
-        <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-6 px-6 lg:px-12 overflow-hidden">
+        <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-6 px-4 sm:px-6 lg:px-12 overflow-y-auto lg:overflow-hidden">
           {/* Left: Artwork / Visualizer / Lyrics / Queue / EQ */}
-          <div className="flex-1 flex flex-col items-center justify-center min-h-0 overflow-hidden rounded-2xl">
+          <div className="flex-none lg:flex-1 flex flex-col items-center justify-center lg:min-h-0 lg:overflow-hidden rounded-2xl py-2">
             <AnimatePresence mode="wait">
               {playerView === 'full' && (
                 <motion.div
@@ -202,8 +208,12 @@ export function FullPlayer() {
                   exit={{ opacity: 0, scale: 0.9 }}
                   className="w-full max-w-md"
                 >
-                  {/* Album Art */}
-                  <div className="relative aspect-square rounded-2xl overflow-hidden shadow-2xl mb-4 group">
+                  {/* Album Art — capped by the window height so it never gets
+                      clipped when the app window is small. */}
+                  <div
+                    className="relative aspect-square rounded-2xl overflow-hidden shadow-2xl mb-4 group mx-auto w-full"
+                    style={{ maxWidth: 'max(180px, min(100%, calc(100vh - 340px)))' }}
+                  >
                     <div
                       className="absolute inset-0"
                       style={{
@@ -286,7 +296,7 @@ export function FullPlayer() {
           </div>
 
           {/* Right side - Track info + controls (visible on larger screens) */}
-          <div className="lg:w-80 flex flex-col justify-center gap-6">
+          <div className="lg:w-80 flex-shrink-0 flex flex-col justify-center gap-6 pb-4 lg:pb-0">
             {/* Track details */}
             <div>
               <div className="flex items-start justify-between mb-1">

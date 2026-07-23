@@ -1250,33 +1250,75 @@ function scanMusicFolder(rootDir) {
   return tracks
 }
 
-// Load the previously imported folder (if any) on startup.
-ipcMain.handle('library:getDir', () => {
-  const importFolder = store.get('importFolder') || null
-  if (!importFolder || !fs.existsSync(importFolder)) {
-    return { success: true, tracks: [], folder: null }
+// ── Multiple import folders ──
+// The user can import several folders at once; each track is tagged with the
+// folder it came from so the renderer can group/filter/play them per folder.
+
+// Read the persisted folder list (migrates the pre-2.9 single-folder key).
+function getImportFolders() {
+  let folders = store.get('importFolders')
+  if (!Array.isArray(folders)) folders = []
+  // Migrate the old single 'importFolder' key once, then remove it so a
+  // folder deleted by the user doesn't come back on the next launch.
+  const legacy = store.get('importFolder')
+  if (legacy) {
+    if (!folders.includes(legacy)) folders.push(legacy)
+    try { store.delete('importFolder') } catch (_) {}
+    store.set('importFolders', folders)
   }
-  const tracks = scanMusicFolder(importFolder)
-  return { success: true, tracks, folder: importFolder }
+  // Drop folders that no longer exist on disk.
+  const existing = folders.filter((f) => { try { return f && fs.existsSync(f) } catch (_) { return false } })
+  if (existing.length !== folders.length) store.set('importFolders', existing)
+  return existing
+}
+
+// Scan every import folder and tag each track with its source folder.
+function scanImportFolders(folders) {
+  const tracks = []
+  for (const folder of folders) {
+    const folderName = path.basename(folder) || folder
+    for (const t of scanMusicFolder(folder)) {
+      t.folder = folder
+      t.folderName = folderName
+      tracks.push(t)
+    }
+  }
+  return tracks
+}
+
+// Load the previously imported folders (if any) on startup.
+ipcMain.handle('library:getDir', () => {
+  const folders = getImportFolders()
+  const tracks = scanImportFolders(folders)
+  return { success: true, tracks, folders, folder: folders[0] || null }
 })
 
-// Let the user pick a folder to import from. Reads it in place (no copying)
-// and remembers it for next time.
+// Let the user pick one or MORE folders to import from. Reads them in place
+// (no copying) and adds them to the remembered list.
 ipcMain.handle('library:import', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
-    title: 'Choose a folder to import music from',
-    properties: ['openDirectory'],
+    title: 'Choose folders to import music from',
+    properties: ['openDirectory', 'multiSelections'],
   })
 
+  const folders = getImportFolders()
   if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
-    const prev = store.get('importFolder') || null
-    return { success: false, tracks: prev ? scanMusicFolder(prev) : [], folder: prev }
+    return { success: false, tracks: scanImportFolders(folders), folders, folder: folders[0] || null }
   }
 
-  const importFolder = result.filePaths[0]
-  store.set('importFolder', importFolder)
-  const tracks = scanMusicFolder(importFolder)
-  return { success: true, tracks, folder: importFolder }
+  for (const f of result.filePaths) {
+    if (!folders.includes(f)) folders.push(f)
+  }
+  store.set('importFolders', folders)
+  return { success: true, tracks: scanImportFolders(folders), folders, folder: folders[0] || null }
+})
+
+// Remove one folder from the imported list. Files on disk are NOT touched —
+// the folder simply stops being shown in the app.
+ipcMain.handle('library:removeFolder', (_event, folder) => {
+  const folders = getImportFolders().filter((f) => f !== folder)
+  store.set('importFolders', folders)
+  return { success: true, tracks: scanImportFolders(folders), folders, folder: folders[0] || null }
 })
 
 // Helper to pre-detect spotdl track count for playlists/albums
@@ -1701,7 +1743,7 @@ ipcMain.handle('download:start', async (event, { id, url, format, bitrate, concu
             if (!event.sender.isDestroyed()) {
               event.sender.send('download:botWalled', { parentId: id })
               event.sender.send('download:trackCompleted', {
-                id: trackId, title: 'Нужны cookies YouTube — см. настройки', artist: '',
+                id: trackId, title: 'Н��жны cookies YouTube — см. настройки', artist: '',
               })
             }
             break
